@@ -780,7 +780,7 @@ export default eslintConfig;
 }
 ```
 
-### 6.4. VSCode Config 설정
+### 6.4. VSCode Config 설정.
 
 - 에디터에 일관성을 유지하는 내용 작성 파일
 - `/.editorconfig 파일`
