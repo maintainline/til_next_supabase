@@ -1,260 +1,566 @@
-# Next.js 프로젝트 환경 설정
+# SCSS
 
-## 1. 프로젝트 생성
-
-```bash
-npx create-next-app@latest .
-```
-
-## 2. 프로젝트 생성 옵션
+## 1. 설치
 
 ```bash
-√ Which linter would you like to use? » ESLint
-√ Would you like to use Tailwind CSS? ... Yes
-√ Would you like your code inside a `src/` directory? ... Yes
-√ Would you like to use App Router? (recommended) ... Yes
-√ Would you like to use Turbopack? (recommended) ... No
-√ Would you like to customize the import alias (`@/*` by default)? ... Yes
-√ What import alias would you like configured? ... @/*
+npm install sass
 ```
 
-## 3. Tailwind 환경 설정
+## 2. 기본적인 구조
 
-- package.json 에서 `tailwind 버전` 확인
-- 아래 처럼 버전이 최신 `4.x` 버전 확인
+### 2.1. `src/styles 폴더` 생성
 
-```json
- "tailwindcss": "^4",
+### 2.2. `src/styles/valiables.scss 파일` 생성
+
+- SCSS 변수들의 모음
+- 색상, 타이포그래피, 간격, 브레이크 포인트 등
+
+```scss
+// SCSS Variables
+$primary-color: #3b82f6;
+$secondary-color: #64748b;
+$success-color: #10b981;
+$warning-color: #f59e0b;
+$error-color: #ef4444;
+
+// Typography
+$font-family-base:
+  'Inter',
+  -apple-system,
+  BlinkMacSystemFont,
+  'Segoe UI',
+  Roboto,
+  sans-serif;
+$font-size-base: 16px;
+$font-size-sm: 14px;
+$font-size-lg: 18px;
+$font-size-xl: 20px;
+
+// Spacing
+$spacing-xs: 0.25rem;
+$spacing-sm: 0.5rem;
+$spacing-md: 1rem;
+$spacing-lg: 1.5rem;
+$spacing-xl: 2rem;
+$spacing-2xl: 3rem;
+
+// Breakpoints
+$breakpoint-sm: 640px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 1024px;
+$breakpoint-xl: 1280px;
+$breakpoint-2xl: 1536px;
+
+// Border radius
+$border-radius-sm: 0.25rem;
+$border-radius-md: 0.375rem;
+$border-radius-lg: 0.5rem;
+$border-radius-xl: 0.75rem;
+
+// Shadows
+$shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+$shadow-md:
+  0 4px 6px -1px rgb(0 0 0 / 0.1),
+  0 2px 4px -2px rgb(0 0 0 / 0.1);
+$shadow-lg:
+  0 10px 15px -3px rgb(0 0 0 / 0.1),
+  0 4px 6px -4px rgb(0 0 0 / 0.1);
 ```
 
-### 3.1. `postcss.config.mjs` 설정 확인
+### 2.3. `src/styles/mixins.scss 파일` 생성
 
-```mjs
-const config = {
-  plugins: ['@tailwindcss/postcss'],
-};
+- 재사용 가능한 믹스인(함수) 들
+- `@include 믹스인이름`
 
-export default config;
-```
+```scss
+// SCSS Mixins
 
-### 3.2. `tailwind.config.ts` 파일 생성
-
-- Tailwind 경로 및 Theme 설정, Plugin 추가, Dark Mode, CSS 변수 연결
-
-```ts
-import type { Config } from 'tailwindcss';
-
-const config: Config = {
-  // 1. 컨텐츠 경로: Tailwind가 클래스를 찾을 파일 경로
-  content: [
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
-  theme: {
-    extend: {
-      // 2. 커스텀 색상: CSS 변수와 연결된 색상 정의
-      colors: {
-        background: 'var(--background)',
-        foreground: 'var(--foreground)',
-      },
-      // 3. 커스텀 폰트: 프로젝트에서 사용할 폰트 패밀리 정의
-      fontFamily: {
-        sans: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-geist-mono)', 'monospace'],
-      },
-    },
-  },
-  // 4. 플러그인: 추가 기능을 위한 플러그인 배열
-  plugins: [],
-};
-
-export default config;
-```
-
-- `tailwind.config.ts` 내용 추가
-
-```ts
-import type { Config } from 'tailwindcss';
-
-const config: Config = {
-  content: [
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
-  darkMode: 'class', // 다크 모드 설정
-  theme: {
-    extend: {
-      // 브랜드 색상 시스템
-      colors: {
-        primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6', // 기본 primary 색상
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          950: '#172554',
-        },
-        // 상태 색상
-        success: {
-          /* 녹색 계열 */
-        },
-        warning: {
-          /* 노란색 계열 */
-        },
-        error: {
-          /* 빨간색 계열 */
-        },
-      },
-
-      // 타이포그래피 시스템
-      fontSize: {
-        xs: ['0.75rem', { lineHeight: '1rem' }],
-        sm: ['0.875rem', { lineHeight: '1.25rem' }],
-        base: ['1rem', { lineHeight: '1.5rem' }],
-        // ... 더 많은 크기
-      },
-
-      // 애니메이션 시스템
-      animation: {
-        'fade-in': 'fadeIn 0.5s ease-in-out',
-        'slide-in': 'slideIn 0.3s ease-out',
-        'bounce-in': 'bounceIn 0.6s ease-out',
-      },
-    },
-  },
-  plugins: [],
-};
-
-export default config;
-```
-
-- 참고 예
-
-```ts
-import type { Config } from 'tailwindcss';
-
-const config: Config = {
-  content: [
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
-  theme: {
-    extend: {
-      colors: {
-        // Linguavibe Brand Colors
-        sky: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9', // Main color
-          600: '#0284c7', // Hover color
-          700: '#0369a1',
-        },
-        teal: {
-          300: '#5eead4',
-          400: '#2dd4bf', // Accent color (vibed)
-          500: '#14b8a6', // Accent hover
-        },
-        gray: {
-          50: '#fafafa',
-          100: '#f5f5f5',
-          200: '#e5e7eb', // Border / line
-          300: '#d1d5db',
-          400: '#9ca3af',
-          500: '#6b7280', // Sub text
-          600: '#4b5563',
-          700: '#374151',
-          800: '#1f2937', // Main text
-          900: '#111827',
-        },
-        stone: {
-          50: '#fafaf9', // Neutral background
-        },
-      },
-      fontFamily: {
-        sans: ['Inter', 'Noto Sans KR', 'sans-serif'],
-      },
-      borderRadius: {
-        xl: '0.75rem', // rounded-xl
-        '2xl': '1rem',
-        '3xl': '1.5rem',
-      },
-      boxShadow: {
-        sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', // shadow-sm (subtle)
-        DEFAULT:
-          '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-        md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-      },
-      maxWidth: {
-        '2xl': '42rem', // Content width
-      },
-      spacing: {
-        18: '4.5rem',
-      },
-      fontSize: {
-        xs: ['0.75rem', { lineHeight: '1.5' }],
-        sm: ['0.875rem', { lineHeight: '1.5' }],
-        base: ['1rem', { lineHeight: '1.6' }], // Body text
-        lg: ['1.125rem', { lineHeight: '1.6' }],
-        xl: ['1.25rem', { lineHeight: '1.5' }],
-        '2xl': ['1.5rem', { lineHeight: '1.4' }],
-        '3xl': ['1.875rem', { lineHeight: '1.3' }],
-        '4xl': ['2.25rem', { lineHeight: '1.2' }],
-        '5xl': ['3rem', { lineHeight: '1.1' }],
-      },
-    },
-  },
-  plugins: [],
-};
-
-export default config;
-```
-
-### 3.3. global.css 설정
-
-- Next.js 의 모든 컴포넌트들이 참조하는 글로벌 css
-- `/src/app/global.css` 업데이트
-- 반드시 `@import 는 css 첫줄`이여야 함.
-- tailwind 4.x 버전이므로 `@import "tailwindcss";`
-
-```css
-@import 'tailwindcss';
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+// Flexbox mixins
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-/* 다크 모드 설정 */
-.dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+@mixin flex-column {
+  display: flex;
+  flex-direction: column;
 }
 
-/* 시스템 다크 모드 지원 */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+// Responsive mixins
+@mixin mobile {
+  @media (max-width: #{$breakpoint-sm - 1px}) {
+    @content;
   }
 }
+
+@mixin tablet {
+  @media (min-width: #{$breakpoint-sm}) and (max-width: #{$breakpoint-md - 1px}) {
+    @content;
+  }
+}
+
+@mixin desktop {
+  @media (min-width: #{$breakpoint-md}) {
+    @content;
+  }
+}
+
+@mixin large-desktop {
+  @media (min-width: #{$breakpoint-lg}) {
+    @content;
+  }
+}
+
+// Button mixins
+@mixin button-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: $border-radius-md;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  border: none;
+  outline: none;
+
+  &:focus {
+    outline: 2px solid $primary-color;
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+@mixin button-primary {
+  @include button-base;
+  background-color: $primary-color;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background-color: darken($primary-color, 10%);
+  }
+}
+
+@mixin button-secondary {
+  @include button-base;
+  background-color: transparent;
+  color: $primary-color;
+  border: 1px solid $primary-color;
+
+  &:hover:not(:disabled) {
+    background-color: $primary-color;
+    color: white;
+  }
+}
+
+// Card mixins
+@mixin card {
+  background-color: white;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-md;
+  padding: $spacing-lg;
+}
+
+// Text mixins
+@mixin text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin text-multiline-truncate($lines: 2) {
+  display: -webkit-box;
+  -webkit-line-clamp: $lines;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+```
+
+### 2.4. `src/styles/components.scss 파일` 생성
+
+- 컴포넌트 샘플에 적용할 scss 파일
+
+```scss
+// SCSS Components
+@import 'variables';
+@import 'mixins';
+
+// Button Components
+.btn {
+  @include button-base;
+  padding: $spacing-sm $spacing-md;
+  font-size: $font-size-base;
+
+  &--primary {
+    @include button-primary;
+  }
+
+  &--secondary {
+    @include button-secondary;
+  }
+
+  &--large {
+    padding: $spacing-md $spacing-lg;
+    font-size: $font-size-lg;
+  }
+
+  &--small {
+    padding: $spacing-xs $spacing-sm;
+    font-size: $font-size-sm;
+  }
+}
+
+// Card Component
+.card {
+  @include card;
+
+  &__header {
+    margin-bottom: $spacing-md;
+    padding-bottom: $spacing-md;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  &__title {
+    font-size: $font-size-xl;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+  }
+
+  &__content {
+    color: #6b7280;
+    line-height: 1.6;
+  }
+
+  &__footer {
+    margin-top: $spacing-md;
+    padding-top: $spacing-md;
+    border-top: 1px solid #e5e7eb;
+    @include flex-between;
+  }
+}
+
+// Form Components
+.form-group {
+  margin-bottom: $spacing-md;
+
+  &__label {
+    display: block;
+    margin-bottom: $spacing-xs;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  &__input {
+    width: 100%;
+    padding: $spacing-sm $spacing-md;
+    border: 1px solid #d1d5db;
+    border-radius: $border-radius-md;
+    font-size: $font-size-base;
+    transition: border-color 0.2s ease-in-out;
+
+    &:focus {
+      outline: none;
+      border-color: $primary-color;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    &--error {
+      border-color: $error-color;
+    }
+  }
+
+  &__error {
+    margin-top: $spacing-xs;
+    color: $error-color;
+    font-size: $font-size-sm;
+  }
+}
+
+// Navigation Component
+.nav {
+  @include flex-between;
+  padding: $spacing-md 0;
+  border-bottom: 1px solid #e5e7eb;
+
+  &__brand {
+    font-size: $font-size-xl;
+    font-weight: 700;
+    color: $primary-color;
+    text-decoration: none;
+  }
+
+  &__menu {
+    @include flex-center;
+    gap: $spacing-lg;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__link {
+    color: #6b7280;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease-in-out;
+
+    &:hover {
+      color: $primary-color;
+    }
+
+    &--active {
+      color: $primary-color;
+    }
+  }
+}
+
+// Responsive adjustments
+@include mobile {
+  .nav {
+    flex-direction: column;
+    gap: $spacing-md;
+
+    &__menu {
+      flex-direction: column;
+      gap: $spacing-sm;
+    }
+  }
+
+  .card {
+    padding: $spacing-md;
+  }
+}
+```
+
+### 2.5. `src/styles/main.scss 파일` 생성
+
+- 메인 scss 파일
+
+```scss
+// Main SCSS file
+@import 'variables';
+@import 'mixins';
+@import 'components';
+
+// Global styles
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: $font-size-base;
+  line-height: 1.6;
+}
+
+body {
+  font-family: $font-family-base;
+  color: #1f2937;
+  background-color: #f9fafb;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// Typography
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0 0 $spacing-md 0;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: 2.5rem;
+
+  @include mobile {
+    font-size: 2rem;
+  }
+}
+
+h2 {
+  font-size: 2rem;
+
+  @include mobile {
+    font-size: 1.75rem;
+  }
+}
+
+h3 {
+  font-size: 1.5rem;
+}
+
+h4 {
+  font-size: 1.25rem;
+}
+
+h5 {
+  font-size: 1.125rem;
+}
+
+h6 {
+  font-size: 1rem;
+}
+
+p {
+  margin: 0 0 $spacing-md 0;
+}
+
+a {
+  color: $primary-color;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// Utility classes
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 $spacing-md;
+
+  @include mobile {
+    padding: 0 $spacing-sm;
+  }
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.mb-0 {
+  margin-bottom: 0;
+}
+.mb-1 {
+  margin-bottom: $spacing-xs;
+}
+.mb-2 {
+  margin-bottom: $spacing-sm;
+}
+.mb-3 {
+  margin-bottom: $spacing-md;
+}
+.mb-4 {
+  margin-bottom: $spacing-lg;
+}
+.mb-5 {
+  margin-bottom: $spacing-xl;
+}
+
+.mt-0 {
+  margin-top: 0;
+}
+.mt-1 {
+  margin-top: $spacing-xs;
+}
+.mt-2 {
+  margin-top: $spacing-sm;
+}
+.mt-3 {
+  margin-top: $spacing-md;
+}
+.mt-4 {
+  margin-top: $spacing-lg;
+}
+.mt-5 {
+  margin-top: $spacing-xl;
+}
+
+.p-0 {
+  padding: 0;
+}
+.p-1 {
+  padding: $spacing-xs;
+}
+.p-2 {
+  padding: $spacing-sm;
+}
+.p-3 {
+  padding: $spacing-md;
+}
+.p-4 {
+  padding: $spacing-lg;
+}
+.p-5 {
+  padding: $spacing-xl;
+}
+
+// Grid system
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -#{$spacing-sm};
+}
+
+.col {
+  flex: 1;
+  padding: 0 $spacing-sm;
+
+  &-1 {
+    flex: 0 0 8.333333%;
+  }
+  &-2 {
+    flex: 0 0 16.666667%;
+  }
+  &-3 {
+    flex: 0 0 25%;
+  }
+  &-4 {
+    flex: 0 0 33.333333%;
+  }
+  &-6 {
+    flex: 0 0 50%;
+  }
+  &-8 {
+    flex: 0 0 66.666667%;
+  }
+  &-9 {
+    flex: 0 0 75%;
+  }
+  &-12 {
+    flex: 0 0 100%;
+  }
+}
+
+@include mobile {
+  .col {
+    flex: 0 0 100%;
+    margin-bottom: $spacing-md;
+  }
+}
+```
+
+## 3. `src/app/global.scss 파일` 생성
+
+- 글로벌 스타일 : global.css 에서 변환함
+
+```scss
+@import '../styles/main.scss';
+@import 'tailwindcss';
 
 /* 기본 스타일 */
 * {
@@ -276,587 +582,62 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-
-/* 스크롤바 스타일링 */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--background);
-}
-
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background: #475569;
-}
-
-/* 포커스 스타일 */
-:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
-
-/* 선택 텍스트 스타일 */
-::selection {
-  background-color: #3b82f6;
-  color: white;
-}
 ```
 
-## 4. Prettier 설정
+## 4. SCSS 테스트해 보기
 
-- Prettier 는 코드 포맷터로, 일관된 코드 스타일을 자동으로 유지함.
+- `src/components/TestComponent.tsx 파일 생성`
 
-### 4.1. 설치
+```tsx
+import React from 'react';
+import '../styles/main.scss';
 
-- `Prettier - Code formatter 설치` 확장프로그램 필요
+interface TestComponentProps {
+  title: string;
+  description?: string;
+}
 
-```bash
-npm install --save-dev prettier
-```
+export default function TestComponent({
+  title,
+  description,
+}: TestComponentProps) {
+  return (
+    <div className='container'>
+      <div className='card'>
+        <div className='card__header'>
+          <h2 className='card__title'>{title}</h2>
+        </div>
+        <div className='card__content'>
+          {description && <p>{description}</p>}
+          <p>이 컴포넌트는 SCSS 스타일을 사용합니다!</p>
+        </div>
+        <div className='card__footer'>
+          <button className='btn btn--primary'>Primary Button</button>
+          <button className='btn btn--secondary'>Secondary Button</button>
+        </div>
+      </div>
 
-### 4.2. `/.prettierrc 파일` 생성
-
-- 포멧팅 규칙 정의 설정
-
-```json
-{
-  "semi": true,
-  "singleQuote": true,
-  "quoteProps": "as-needed",
-  "trailingComma": "es5",
-  "tabWidth": 2,
-  "useTabs": false,
-  "printWidth": 80,
-  "endOfLine": "lf",
-  "bracketSpacing": true,
-  "bracketSameLine": false,
-  "arrowParens": "avoid",
-  "htmlWhitespaceSensitivity": "css",
-  "jsxSingleQuote": true,
-  "proseWrap": "preserve",
-  "embeddedLanguageFormatting": "auto",
-  "singleAttributePerLine": false
+      <div className='row mt-4'>
+        <div className='col col-6'>
+          <div className='card'>
+            <h3>반응형 그리드</h3>
+            <p>모바일에서는 전체 너비를 차지합니다.</p>
+          </div>
+        </div>
+        <div className='col col-6'>
+          <div className='card'>
+            <h3>SCSS 믹스인</h3>
+            <p>@include를 사용한 스타일 재사용</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 ```
 
-### 4.3. 위 내용의 설명
+- `src/app/layout.tsx` 변경
 
-- `semi`: 세미콜론 사용 (true: ;, false: 없음)
-- `singleQuote`: 작은따옴표 사용 (true: ', false: ")
-- `quoteProps`: 객체 속성에 따옴표 사용 ("as-needed": 필요시만, "consistent": 일관성, "preserve": 보존)
-- `trailingComma`: 후행 쉼표 사용 ("none": 없음, "es5": ES5에서 허용되는 곳, "all": 모든 곳)
-- `tabWidth`: 탭 너비 (공백 수)
-- `useTabs`: 탭 대신 공백 사용 (false: 공백, true: 탭)
-- `printWidth`: 한 줄 최대 길이 (문자 수)
-- `endOfLine`: 줄 끝 문자 ("lf": \n, "crlf": \r\n, "cr": \r, "auto": 자동)
-- `bracketSpacing`: 객체 리터럴 괄호 내부 공백 (true: { foo }, false: {foo})
-- `bracketSameLine`: JSX 닫는 괄호를 같은 줄에 (false: 새 줄, true: 같은 줄)
-- `arrowParens`: 화살표 함수 매개변수 괄호 ("avoid": 단일 매개변수 시 생략, "always": 항상 사용)
-- `htmlWhitespaceSensitivity`: HTML 공백 민감도 ("css": CSS display 속성 기준, "strict": 엄격, "ignore": 무시)
-- `jsxSingleQuote`: JSX에서 작은따옴표 사용 (true: ', false: ")
-- `proseWrap`: 마크다운 텍스트 줄바꿈 ("always": 항상, "never": 절대, "preserve": 보존)
-- `embeddedLanguageFormatting`: 임베디드 언어 포맷팅 ("auto": 자동, "off": 비활성화)
-- `singleAttributePerLine`: JSX 속성을 한 줄에 하나씩 (false: 여러 속성 허용, true: 한 줄에 하나)
-
-### 4.4. `/.prettierignore 파일` 생성
-
-- 포멧팅에서 제외할 파일들을 명시함.
-
-```txt
-# Dependencies
-node_modules/
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-
-# Build outputs
-.next/
-out/
-build/
-dist/
-
-# Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-
-# Gatsby files
-.cache/
-public
-
-# Storybook build outputs
-.out
-.storybook-out
-
-# Temporary folders
-tmp/
-temp/
-
-# Editor directories and files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Generated files
-*.min.js
-*.min.css
-*.bundle.js
-*.bundle.css
-
-# Documentation
-CHANGELOG.md
-LICENSE
-# README.md
-
-# Config files that should not be formatted
-*.config.js
-*.config.mjs
-*.config.ts
-```
-
-### 4.5. 명령어로 포멧팅을 한번에 실행하도록 스크립트 작성(선택)
-
-- `package.json` 에 Script 추가
-
-```json
-"scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "format:staged": "prettier --write --ignore-unknown"
-  }
-```
-
-### 4.6. 스크립트 실행 예제
-
-```txt
-# 전체 프로젝트 포맷팅
-npm run format
-
-# 포맷팅 체크 (변경사항 없이 확인만)
-npm run format:check
-
-# 특정 파일만 포맷팅
-npx prettier --write src/app/page.tsx
-
-# 특정 디렉토리만 포맷팅
-npx prettier --write src/components/
-
-# 포맷팅 결과 미리보기 (실제 변경하지 않음)
-npx prettier --check src/app/page.tsx
-```
-
-## 5. ESLint 설정
-
-- 코드 품질 검사 도구
-
-### 5.1. `eslint.config.mjs` 설정
-
-- rules(검사 규칙) 추가
-
-```mjs
-rules: {
-    "@typescript-eslint/no-explicit-any": "off",  // any 타입 허용
-  }
-```
-
-- 자세한 옵션을 포함한예제
-
-```mjs
-// Node.js 내장 모듈에서 dirname 함수를 가져옴 (파일 경로의 디렉토리명 추출용)
-import { dirname } from 'path';
-
-// Node.js 내장 모듈에서 fileURLToPath 함수를 가져옴 (URL을 파일 경로로 변환)
-import { fileURLToPath } from 'url';
-
-// ESLint의 FlatCompat 클래스를 가져옴 (기존 설정 형식을 새로운 flat config 형식으로 변환)
-import { FlatCompat } from '@eslint/eslintrc';
-
-// 현재 파일의 URL을 파일 경로로 변환 (ES 모듈에서 __filename 대체)
-const __filename = fileURLToPath(import.meta.url);
-
-// 현재 파일이 위치한 디렉토리 경로를 추출 (ES 모듈에서 __dirname 대체)
-const __dirname = dirname(__filename);
-
-// FlatCompat 인스턴스를 생성하여 기존 ESLint 설정을 새로운 형식으로 변환할 수 있게 함
-const compat = new FlatCompat({
-  baseDirectory: __dirname, // 기준 디렉토리를 현재 프로젝트 루트로 설정
-});
-
-// ESLint 설정 배열 정의 (flat config 형식)
-const eslintConfig = [
-  // Next.js의 기본 ESLint 규칙들을 확장 (성능, 접근성, TypeScript 관련 규칙 포함)
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
-
-  // 전역 설정: ESLint가 검사하지 않을 파일/디렉토리 지정
-  {
-    ignores: [
-      'node_modules/**', // npm 패키지들이 설치된 디렉토리 (외부 라이브러리)
-      '.next/**', // Next.js 빌드 결과물 디렉토리
-      'out/**', // Next.js 정적 내보내기 결과물 디렉토리
-      'build/**', // 일반적인 빌드 결과물 디렉토리
-      'next-env.d.ts', // Next.js TypeScript 환경 정의 파일 (자동 생성)
-    ],
-  },
-
-  // 파일별 규칙 설정: 특정 파일 확장자에 적용할 규칙들
-  {
-    files: ['**/*.{js,jsx,ts,tsx}'], // JavaScript, JSX, TypeScript, TSX 파일에 적용
-    rules: {
-      // ===== Tailwind CSS 관련 규칙 =====
-      'tailwindcss/classnames-order': 'warn', // Tailwind 클래스 순서를 일관되게 정렬 (경고)
-      'tailwindcss/no-custom-classname': 'warn', // 정의되지 않은 커스텀 클래스 사용 시 경고
-      'tailwindcss/no-contradicting-classname': 'error', // 상충하는 클래스 사용 시 오류 (예: hidden block)
-
-      // ===== React 관련 규칙 =====
-      'react/jsx-key': 'error', // 배열 렌더링 시 각 요소에 고유한 key prop 필수 (오류)
-      'react/no-unescaped-entities': 'off', // HTML 엔티티(&, <, > 등) 직접 사용 허용 (비활성화)
-      'react/display-name': 'off', // 함수형 컴포넌트의 displayName 설정 필수 해제 (비활성화)
-
-      // ===== 일반적인 JavaScript/TypeScript 규칙 =====
-      'prefer-const': 'error', // 재할당되지 않는 변수는 const 사용 강제 (오류)
-      'no-unused-vars': 'off', // 기본 unused variables 규칙 비활성화 (TypeScript 버전 사용)
-      '@typescript-eslint/no-unused-vars': [
-        // TypeScript용 사용되지 않는 변수 감지 규칙
-        'error', // 오류 레벨로 설정
-        { argsIgnorePattern: '^_' }, // _로 시작하는 매개변수는 사용하지 않아도 허용
-      ],
-      '@typescript-eslint/no-explicit-any': 'off', // any 타입 사용 허용 (타입 안전성 규칙 비활성화)
-
-      // ===== Import 관련 규칙 =====
-      'import/order': [
-        // import 문의 순서와 그룹화 규칙
-        'error', // 오류 레벨로 설정
-        {
-          groups: [
-            // import 그룹 순서 정의
-            'builtin', // 1순위: Node.js 내장 모듈 (fs, path 등)
-            'external', // 2순위: npm 패키지 (react, next 등)
-            'internal', // 3순위: 프로젝트 내부 모듈 (@/components 등)
-            'parent', // 4순위: 상위 디렉토리 모듈 (../utils 등)
-            'sibling', // 5순위: 같은 디렉토리 모듈 (./config 등)
-            'index', // 6순위: index 파일 (./index 등)
-          ],
-          'newlines-between': 'always', // 각 그룹 사이에 빈 줄 필수
-          alphabetize: {
-            // 그룹 내에서 알파벳 순 정렬
-            order: 'asc', // 오름차순 정렬 (a-z)
-            caseInsensitive: true, // 대소문자 구분 없이 정렬
-          },
-        },
-      ],
-    },
-  },
-];
-
-// ESLint 설정을 기본 내보내기로 설정
-export default eslintConfig;
-```
-
-### 5.2. Prettier 와 ESLint 통합 설정
-
-- ESLint 와 Prettier 충돌 하지 않도록 설정
-
-```bash
-npm install --save-dev eslint-config-prettier
-```
-
-```bash
-npm install --save-dev eslint-plugin-prettier
-```
-
-- `eslint.config.mjs` 에 prettier 설정 추가
-
-```mjs
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { FlatCompat } from '@eslint/eslintrc';
-
-// Prettier 플러그인 추가
-import eslintPluginPrettier from 'eslint-plugin-prettier';
-import eslintConfigPrettier from 'eslint-config-prettier';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
-const eslintConfig = [
-  ...compat.extends('next/core-web-vitals', 'next/typescript', 'prettier'),
-  {
-    plugins: {
-      prettier: eslintPluginPrettier, //  Prettier 플러그인 추가
-    },
-    rules: {
-      ...eslintConfigPrettier.rules, //  Prettier와 충돌하는 ESLint 규칙 비활성화
-      'prettier/prettier': ['warn', { endOfLine: 'auto' }], //  Prettier 스타일을 강제 적용 (오류 발생 시 ESLint에서 표시)
-      '@typescript-eslint/no-unused-vars': 'warn', //  기존 TypeScript 규칙 유지
-      '@typescript-eslint/no-explicit-any': 'off', //  any 타입 사용 허용
-    },
-  },
-];
-
-export default eslintConfig;
-```
-
-## 6. VSCode 설정 관리
-
-- `/.vscode 폴더 ` 생성
-- `/.vscode/settings.json 파일 `생성
-
-```json
-{
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.formatOnSave": true,
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
-  }
-}
-```
-
-### 6.1. 아래는 참조 내용
-
-```json
-{
-  // ===== 기본 에디터 설정 =====
-  "editor.formatOnSave": true,
-  "editor.formatOnPaste": true,
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": "explicit",
-    "source.organizeImports": "explicit"
-  },
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.tabSize": 2,
-  "editor.insertSpaces": true,
-  "editor.rulers": [80, 120],
-  "editor.wordWrap": "on",
-  "editor.bracketPairColorization.enabled": true,
-
-  // ===== 파일 관련 설정 =====
-  "files.autoSave": "onFocusChange",
-  "files.trimTrailingWhitespace": true,
-  "files.insertFinalNewline": true,
-  "files.eol": "\n",
-  "files.encoding": "utf8",
-
-  // ===== ESLint 설정 =====
-  "eslint.enable": true,
-  "eslint.validate": [
-    "javascript",
-    "javascriptreact",
-    "typescript",
-    "typescriptreact"
-  ],
-  "eslint.format.enable": true,
-
-  // ===== Prettier 설정 =====
-  "prettier.enable": true,
-  "prettier.requireConfig": true,
-
-  // ===== 언어별 포맷터 설정 =====
-  "[javascript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "[typescript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "[typescriptreact]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
-}
-```
-
-### 6.2. 아래는 참조 설명
-
-- **`editor.formatOnSave`**: 저장 시 자동 포맷팅
-- **`editor.codeActionsOnSave`**: 저장 시 ESLint 자동 수정 및 import 정리
-- **`files.autoSave`**: 포커스 변경 시 자동 저장
-- **`files.trimTrailingWhitespace`**: 줄 끝 공백 자동 제거
-- **`files.insertFinalNewline`**: 파일 끝에 빈 줄 자동 삽입
-- **`eslint.validate`**: ESLint가 검사할 파일 형식 지정
-
-### 6.3. 확장 프로그램 설정
-
-- `/.vscode/extension.json` 확장 프로그램 정의 내용 작성
-
-```json
-{
-  "recommendations": [
-    // ===== 필수 확장 프로그램 =====
-    "esbenp.prettier-vscode",
-    "dbaeumer.vscode-eslint",
-    "bradlc.vscode-tailwindcss",
-    "ms-vscode.vscode-typescript-next",
-
-    // ===== Next.js 및 React 개발 =====
-    "formulahendry.auto-rename-tag",
-    "christian-kohler.path-intellisense",
-    "christian-kohler.npm-intellisense",
-
-    // ===== Git 관련 =====
-    "eamodio.gitlens",
-    "mhutchie.git-graph",
-
-    // ===== 개발 생산성 =====
-    "redhat.vscode-yaml",
-    "yzhang.markdown-all-in-one",
-
-    // ===== 테마 및 아이콘 =====
-    "pkief.material-icon-theme",
-    "github.github-vscode-theme"
-  ],
-  "unwantedRecommendations": ["hookyqr.beautify"]
-}
-```
-
-### 6.4. VSCode Config 설정.
-
-- 에디터에 일관성을 유지하는 내용 작성 파일
-- `/.editorconfig 파일`
-
-```txt
-# 최상위 EditorConfig 파일
-root = true
-
-# 모든 파일에 대한 기본 설정
-[*]
-charset = utf-8
-end_of_line = lf
-insert_final_newline = true
-trim_trailing_whitespace = true
-indent_style = space
-indent_size = 2
-
-# JavaScript/TypeScript 파일 설정
-[*.{js,jsx,ts,tsx}]
-indent_style = space
-indent_size = 2
-end_of_line = lf
-charset = utf-8
-trim_trailing_whitespace = true
-insert_final_newline = true
-
-# JSON 파일 설정
-[*.json]
-indent_style = space
-indent_size = 2
-end_of_line = lf
-charset = utf-8
-trim_trailing_whitespace = true
-insert_final_newline = true
-
-# CSS/SCSS 파일 설정
-[*.{css,scss,sass,less}]
-indent_style = space
-indent_size = 2
-end_of_line = lf
-charset = utf-8
-trim_trailing_whitespace = true
-insert_final_newline = true
-
-# Markdown 파일 설정
-[*.md]
-indent_style = space
-indent_size = 2
-end_of_line = lf
-charset = utf-8
-trim_trailing_whitespace = false
-insert_final_newline = true
-```
-
-## 7. Git 설정
-
-### 7.1. remote 연결
-
-```bash
-git remote add origin 깃허브 주소
-```
-
-### 7.2. 현재 깃 상태
-
-```bash
-git status
-```
-
-### 7.3. 현재 깃 사용자 정보 확인 및 수정
-
-```bash
-git config --global user.name
-git config --global user.email
-```
-
-```bash
-git config --global user.name '아이디'
-git config --global user.email '이메일'
+```tsx
+import './globals.scss'; // 변경
 ```

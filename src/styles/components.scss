@@ -1,0 +1,149 @@
+// SCSS Components
+@import 'variables';
+@import 'mixins';
+
+// Button Components
+.btn {
+  @include button-base;
+  padding: $spacing-sm $spacing-md;
+  font-size: $font-size-base;
+
+  &--primary {
+    @include button-primary;
+  }
+
+  &--secondary {
+    @include button-secondary;
+  }
+
+  &--large {
+    padding: $spacing-md $spacing-lg;
+    font-size: $font-size-lg;
+  }
+
+  &--small {
+    padding: $spacing-xs $spacing-sm;
+    font-size: $font-size-sm;
+  }
+}
+
+// Card Component
+.card {
+  @include card;
+
+  &__header {
+    margin-bottom: $spacing-md;
+    padding-bottom: $spacing-md;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  &__title {
+    font-size: $font-size-xl;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+  }
+
+  &__content {
+    color: #6b7280;
+    line-height: 1.6;
+  }
+
+  &__footer {
+    margin-top: $spacing-md;
+    padding-top: $spacing-md;
+    border-top: 1px solid #e5e7eb;
+    @include flex-between;
+  }
+}
+
+// Form Components
+.form-group {
+  margin-bottom: $spacing-md;
+
+  &__label {
+    display: block;
+    margin-bottom: $spacing-xs;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  &__input {
+    width: 100%;
+    padding: $spacing-sm $spacing-md;
+    border: 1px solid #d1d5db;
+    border-radius: $border-radius-md;
+    font-size: $font-size-base;
+    transition: border-color 0.2s ease-in-out;
+
+    &:focus {
+      outline: none;
+      border-color: $primary-color;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    &--error {
+      border-color: $error-color;
+    }
+  }
+
+  &__error {
+    margin-top: $spacing-xs;
+    color: $error-color;
+    font-size: $font-size-sm;
+  }
+}
+
+// Navigation Component
+.nav {
+  @include flex-between;
+  padding: $spacing-md 0;
+  border-bottom: 1px solid #e5e7eb;
+
+  &__brand {
+    font-size: $font-size-xl;
+    font-weight: 700;
+    color: $primary-color;
+    text-decoration: none;
+  }
+
+  &__menu {
+    @include flex-center;
+    gap: $spacing-lg;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__link {
+    color: #6b7280;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease-in-out;
+
+    &:hover {
+      color: $primary-color;
+    }
+
+    &--active {
+      color: $primary-color;
+    }
+  }
+}
+
+// Responsive adjustments
+@include mobile {
+  .nav {
+    flex-direction: column;
+    gap: $spacing-md;
+
+    &__menu {
+      flex-direction: column;
+      gap: $spacing-sm;
+    }
+  }
+
+  .card {
+    padding: $spacing-md;
+  }
+}
