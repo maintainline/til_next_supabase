@@ -1,0 +1,72 @@
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.container {
+  padding: $spacing-lg;
+  max-width: 800px;
+  margin: 0 auto;
+
+  @include mobile {
+    padding: $spacing-md;
+  }
+}
+
+.title {
+  color: $primary-color;
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: $spacing-md;
+
+  @include mobile {
+    font-size: 1.5rem;
+  }
+}
+
+.description {
+  color: $text-color;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin-bottom: $spacing-lg;
+}
+
+.buttonGroup {
+  @include flex-center;
+  gap: $spacing-md;
+  margin-bottom: $spacing-xl;
+
+  @include mobile {
+    @include flex-column;
+    gap: $spacing-sm;
+  }
+}
+
+.primaryButton {
+  @include button-primary;
+  padding: $spacing-sm $spacing-lg;
+}
+
+.secondaryButton {
+  @include button-secondary;
+  padding: $spacing-sm $spacing-lg;
+}
+
+.card {
+  @include card;
+
+  h3 {
+    color: $primary-color;
+    margin-bottom: $spacing-sm;
+    font-size: 1.25rem;
+  }
+
+  p {
+    color: $text-color;
+    line-height: 1.6;
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $shadow-lg;
+    transition: all 0.2s ease-in-out;
+  }
+}
