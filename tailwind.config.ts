@@ -1,57 +1,27 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  // 1. 컨텐츠 경로: Tailwind가 클래스를 찾을 파일 경로
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-  darkMode: "class", // 다크 모드 설정
   theme: {
     extend: {
-      // 브랜드 색상 시스템
+      // 2. 커스텀 색상: CSS 변수와 연결된 색상 정의
       colors: {
-        primary: {
-          50: "#eff6ff",
-          100: "#dbeafe",
-          200: "#bfdbfe",
-          300: "#93c5fd",
-          400: "#60a5fa",
-          500: "#3b82f6", // 기본 primary 색상
-          600: "#2563eb",
-          700: "#1d4ed8",
-          800: "#1e40af",
-          900: "#1e3a8a",
-          950: "#172554",
-        },
-        // 상태 색상
-        success: {
-          /* 녹색 계열 */
-        },
-        warning: {
-          /* 노란색 계열 */
-        },
-        error: {
-          /* 빨간색 계열 */
-        },
+        background: "var(--background)",
+        foreground: "var(--foreground)",
       },
-
-      // 타이포그래피 시스템
-      fontSize: {
-        xs: ["0.75rem", { lineHeight: "1rem" }],
-        sm: ["0.875rem", { lineHeight: "1.25rem" }],
-        base: ["1rem", { lineHeight: "1.5rem" }],
-        // ... 더 많은 크기
-      },
-
-      // 애니메이션 시스템
-      animation: {
-        "fade-in": "fadeIn 0.5s ease-in-out",
-        "slide-in": "slideIn 0.3s ease-out",
-        "bounce-in": "bounceIn 0.6s ease-out",
+      // 3. 커스텀 폰트: 프로젝트에서 사용할 폰트 패밀리 정의
+      fontFamily: {
+        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "monospace"],
       },
     },
   },
+  // 4. 플러그인: 추가 기능을 위한 플러그인 배열
   plugins: [],
 };
 

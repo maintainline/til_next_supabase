@@ -77,7 +77,7 @@ tmp/
 temp/
 
 # Editor directories and files
-#.vscode/
+.vscode/
 .idea/
 *.swp
 *.swo
@@ -105,5 +105,5 @@ LICENSE
 
 # Config files that should not be formatted
 *.config.js
-# *.config.mjs
+*.config.mjs
 *.config.ts
