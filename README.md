@@ -395,7 +395,95 @@ export async function deletePost(id: number): Promise<void> {
 - `src/hooks/useUsers.ts 파일` 생성
 
 ```ts
+// 사용자 목록을 관리하는 React Query 훅
+// 사용자 목록을 가져오고 관리하는 기능을 제공함.
+// React Query 의  useQuery 를 활용함.
+// 캐싱, 로딩, 에러 처리를 자동화 함.
 
+import { fetchUser, fetchUsers } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
+
+/* 사용자 목록 가져오기
+ * - 사용자 목록 자동 로딩
+ * - 로딩 상태 관리
+ * - 에러 상태 관리
+ * - 데이터 캐싱
+ * - 자동 리페치
+ **/
+export function useUsers() {
+  // useQuery :  정보가져오기
+  return useQuery({
+    // 쿼리 키 : 데이터 캐싱 구별을 위한 키값을 설정
+    queryKey: ['users'],
+    // 쿼리함수 : 실제 데이터를 가져오는 함수 연결
+    queryFn: fetchUsers,
+    // 쿼리 개별 옵션
+    staleTime: 5 * 60 * 1000, // 5분간은 호출을 막는다. 즉 fresh 유지
+    gcTime: 10 * 60 * 1000, // 10분간 캐시를 유지함.
+  });
+}
+// 각 사용자, 즉 특정 사용자 정보 가져옹는 훅
+export function useUser(id: number) {
+  //ID 가 유효한지 검사 (id가 null, undefined,0 이하면)
+  const isValidId = (id: number) => {
+    return id !== null && id !== undefined && id > 0;
+  };
+  // useQuery : 정보 호출
+  return useQuery({
+    //쿼리의 구분을 위한 Key 생성
+    queryKey: ['users', id],
+    //실행할 함수
+    queryFn: () => fetchUser(id),
+    // 사용자 ID가 null, undefined, 0 보다 작으면 실행되지 않도록
+    enabled: isValidId(id),
+    // 쿼리 옵션
+    staleTime: 5 * 60 * 1000, // 5분간은 호출을 막는다, 즉 fresh 유지
+    gcTime: 10 * 60 * 1000, // 10 분간 캐시를 유지함
+  });
+}
+
+// 사용자와 해당 사용자의 게시글을 함께 가져오는 훅
+export function useUserWithPosts() {
+  // 먼저 사용자 목록을 가져옴
+  const usersQuery = useUsers();
+
+  // 사용자 목록이 성공적으로 로드가 된 경우에만 게시글 가져옴
+  const postsQueries = useQuery({
+    // Query 구분용 Key 생성
+    queryKey: ['users', 'posts'],
+    // 호출시 실행할 함수 생성
+    queryFn: async () => {
+      // 사용자들이 없다면 비어있는 배열을 리턴한다.
+      // 상위에서 if 문등의 조건을 이용하면 정확히 자료가 있다는
+      // 타입좁히기 또는 타입가드가 적용됨
+      if (!usersQuery.data || usersQuery.data.length === 0) return [];
+
+      // 사용자들이 있다면 모든 사용자의 게시글을 가져옴
+      // 여러명의 사용자가 있을 것이다. 그래서 병렬로 자료를 가져옴
+      const postsPromises = usersQuery.data.map(user =>
+        fetch(
+          `https://jsonplaceholder.typicode.com/posts?userId=${user.id}`
+        ).then(res => res.json())
+      );
+
+      const allPosts = await Promise.all(postsPromises);
+
+      // 사용자별 게시글을 그룹화한다.
+      return usersQuery.data.map((user, index) => ({
+        ...user,
+        posts: allPosts[index],
+      }));
+    },
+    // 사용자 목록이 성공적으로 로드된 경우에만 실행하라
+    enabled: usersQuery.isSuccess,
+  });
+
+  return {
+    ...postsQueries,
+    // 원본 사용자 쿼리 정보도 함께 반환
+    usersQuery,
+  };
+}
 ```
 
 ### 6.3. 게시글 관련 훅
@@ -403,7 +491,190 @@ export async function deletePost(id: number): Promise<void> {
 - `src/hooks/usePosts.ts 파일` 생성
 
 ```ts
+// 게시글을 관리하는 React Query 훅
 
+import {
+  createPost,
+  deletePost,
+  fetchPost,
+  fetchPosts,
+  Post,
+  updatePost,
+} from '@/lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+// 게시글 목록을 가져오는 훅
+export function usePosts(userId?: number) {
+  // useQuery : 정보 가져오기
+  return useQuery({
+    // 쿼리구분용 Key 생성
+    // 사용자 ID가 있으면 포함하여 캐시 키 생성
+    // 사용자 ID가 없으면 정해진 캐시 키 생성
+    queryKey: userId ? ['posts', 'user', userId] : ['posts'],
+    // 쿼리함수 : API 를 사용자 ID에 따라서 호출해줌
+    queryFn: () => fetchPosts(userId),
+    // 쿼리 개별 옵션
+    staleTime: 5 * 60 * 1000, // 5분간은 호출을 막는다. 즉 fresh 유지
+    gcTime: 10 * 60 * 1000, // 10분간 캐시를 유지함.
+  });
+}
+
+// 특정 게시글 정보를 가져오는 훅
+export function usePost(id: number) {
+  return useQuery({
+    queryKey: ['posts', id],
+    queryFn: () => fetchPost(id),
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+// 새글을 등록하는 훅
+export function useCreatePost() {
+  // 꼭 알아두자
+  // 아래 구문은 React Query의 데이터 저장소에 접근하기 위한 훅
+  // 서버에서 가져온 데이터를 관리하는 관리자를 불러옴
+  // 내부적으로 useQuery, useMustaion 훅이 관리하느 캐시를 전체 관리하는 훅
+  const queryClient = useQueryClient();
+
+  // useMustation :  데이터 생성, 업데이트, 삭제 등..
+  return useMutation({
+    // 뮤테이션 함수 : API 를 이용한 새 게시글 생성 함수 연결
+    mutationFn: createPost,
+    // 성공시 실행되는 함수
+    onSuccess: newPost => {
+      // 게시글 목록 쿼리들을 무효화해서 최신 데이터를 다시 가져오도록 함.
+      // 아래 구문은 특정 쿼리 키의 캐시를 무효화 함.
+      // React Query 가 자동으로 최신 데이터를 다시 가져오게 하는 함수
+      // 지금 캐시에 저장된 posts 가 오래 되었으니, 다시 서버에서 가져와
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+
+      // 새로 생성된 게시글을 캐시에 추가
+      // 아래 구문은 서버에서 다시 데이터를 가져오지 않고, 캐시 데이터를 직접 수정함
+      // 사용자가 새로고침 하지 않아도 최신 내용이 보여지도록 함.
+      queryClient.setQueryData(['posts', newPost.id], newPost);
+    },
+    // 에러시 실행되는 함수
+    onError: error => {
+      console.log('글등록 실패했어요.', error);
+    },
+  });
+}
+
+// 글을 수정하는 훅
+export function useUpdatePost() {
+  const queryClient = useQueryClient();
+  // useMutaion: 데이터 생성, 업데이트, 삭제 등..
+  return useMutation({
+    // 뮤테이션 함수 : API 를 이용한 게시글 업데이트 함수 연결
+    // Partial 제네릭은 모든 객체 속성을 Optional 로 변환 즉, ? 를 모두 붙여줌
+    /*
+    export interface Post {
+        id: number;   // 필수
+        userId: number; // 필수
+        title: string; // 필수
+        body: string; // 필수
+    }
+    */
+    // Partial<Post> 적용시
+    /*
+    export interface Post {
+        id?: number;   // 옵션
+        userId?: number; // 옵션
+        title?: string; // 옵션
+        body?: string; // 옵션
+    }
+    */
+
+    mutationFn: ({ id, post }: { id: number; post: Partial<Post> }) =>
+      updatePost(id, post),
+    // 성공시
+    onSuccess: updatePost => {
+      // 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ['posts', updatePost.id] });
+      // 게시글 목록 쿼리들도 무효화
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      //  수정된 게시글들을 캐시에 업데이트
+      queryClient.setQueryData(['posts', updatePost.id], updatePost);
+    },
+    // 실패시
+    onError: error => {
+      console.log('글 수정에 실패했습니다.', error);
+    },
+  });
+}
+
+// 게시글 삭제
+export function useDeletePost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // 다음처럼 사용하기 위해서 정의함.
+    // const deleteMuation = useDeletePost();
+    // deleteMuation.mutate(123)
+    mutationFn: deletePost,
+
+    // 아래는 참고사항
+    // const deleteMuation = useDeletePost(123);
+    // deleteMuation.mutate()
+    // mutationFn: () => deletePost(id),
+
+    // 성공시
+    // 아래는 기억을 합시다..
+    // 첫번째 매개변수 _ 의 의미는 mutaion  의 결과를 말함.
+    // _ 의 코딩상 의미는 사용하지 않는 변수이다를 표현함.
+    // deletePost 함수 API 는 결과를 리턴하는 것이 없다.
+    // 사용하지 않는 리턴 결과임을 표현하기 위해서 _ 를 사용함
+    //
+
+    // 아래 첫번째 매개변수 : _ 는 결과값
+    // 두번째 매개변수 deletedId 는 deletePost(매개변수) 에 전달한 매개변수를 참조함
+    // deleteMuation.mutate(123)
+
+    onSuccess: (_, deletedId) => {
+      // 삭제된 게시글 쿼리 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ['posts', deletedId] });
+      // 목록갱신을 위해서 캐시를 지움
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+    },
+    // 실패시
+    onError: error => {
+      console.log('삭제에 실패했어요.', error);
+    },
+  });
+}
+// 게시글과 댓글을 함께 가져오는 훅
+export function usePostWithComments(userId?: number) {
+  // 먼저 게시글 목록을 가져옴
+  const postsQuery = usePosts(userId);
+  // 게시글 목록에 성공적으로 로드된 경우에만 댓글을 가져옴
+  const commentsQuery = useQuery({
+    queryKey: ['posts', 'comments', userId],
+    queryFn: async () => {
+      if (!postsQuery.data) return [];
+      // 모든 게시글의 댓글을 병렬로 가져옴
+      const commentsPromises = postsQuery.data.map(post =>
+        fetch(
+          `https://jsonplaceholder.typicode.com/posts/${post.id}/comments`
+        ).then(res => res.json())
+      );
+
+      const allCommentes = await Promise.all(commentsPromises);
+      return postsQuery.data.map((post, index) => ({
+        ...post,
+        comments: allCommentes[index],
+      }));
+    },
+    // 게시글 목록이 성공적으로 로드된 경우만 실행
+    enabled: postsQuery.isSuccess,
+  });
+
+  return {
+    ...commentsQuery,
+    // 원본 게시글 쿼리 정보도 함께 반환
+    postsQuery,
+  };
+}
 ```
 
 ### 6.4. 할일 관련 훅
@@ -411,5 +682,238 @@ export async function deletePost(id: number): Promise<void> {
 - `src/hooks/useTodos.ts 파일` 생성
 
 ```ts
+// 할일을 관리하는 React Query 훅
+
+import { fetchTodos, Todo } from '@/lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { error } from 'console';
+
+// 할일 목록 가져오기 훅
+export function useTodos(userId?: number) {
+  return useQuery({
+    queryKey: userId ? ['todos', 'user', userId] : ['todos'],
+    queryFn: () => fetchTodos(userId),
+    staleTime: 1 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+}
+
+// 완료 상태로 할일을 필터링 하는 훅
+export function useTodaysByStatus(userId?: number, completed?: boolean) {
+  return useQuery({
+    queryKey: ['todos', 'user', userId, 'status', completed],
+    queryFn: async () => {
+      const todos = await fetchTodos(userId);
+      // 완료 상태가 지정된 경우 필터링
+      // complted === true :  완료
+      // complted === false :  미완료
+      // complted === undefiend :  모두다
+      if (completed !== undefined) {
+        return todos.filter(todo => todo.completed === completed);
+      }
+      return todos;
+    },
+    staleTime: 1 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+}
+// 할일 통계 정보를 가져오는 훅
+export function useTodoStats(userId?: number) {
+  const todosQuery = useTodos(userId);
+
+  return {
+    ...todosQuery,
+    // 통계 데이터 계산
+    data: todosQuery.data
+      ? {
+          total: todosQuery.data.length,
+          completed: todosQuery.data.filter(todo => todo.completed).length,
+          pending: todosQuery.data.filter(todo => !todo.completed).length,
+          completionRate:
+            todosQuery.data.length > 0
+              ? (todosQuery.data.filter(todo => todo.completed).length /
+                  todosQuery.data.length) *
+                100
+              : 0,
+        }
+      : undefined,
+  };
+}
+
+// 새 할일 생성하는 뮤테이션 훅
+export function useCreateTodo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (todo: Omit<Todo, 'id'>) => {
+      // 실제 API 테스트 못하므로 데모용으로
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return { ...todo, id: Math.random() * 1000 };
+    },
+    onSuccess: newTodo => {
+      // 할일 목록 쿼리들을 무효화
+      queryClient.invalidateQueries({ queryKey: ['todos'] });
+
+      // 새로 생성된 할일을 캐시에 추가
+      queryClient.setQueryData(['todos', newTodo.id], newTodo);
+    },
+    onError: error => {
+      console.log('할일 생성에 실패했어요.', error);
+    },
+  });
+}
+
+// 할일을 수정하는 뮤테이션 훅
+export function useUpdateTodo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      updates,
+    }: {
+      id: number;
+      updates: Partial<Todo>;
+    }) => {
+      // 실제 API 테스트 못하므로 데모용으로
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return { id, ...updates };
+    },
+    onSuccess: updatedTodo => {
+      // 해당 할일 쿼리를 무효화
+      queryClient.invalidateQueries({ queryKey: ['todos', updatedTodo.id] });
+      // 할일 목록 쿼리들도 무효화
+      queryClient.invalidateQueries({ queryKey: ['todos'] });
+      // 수정된 할일을 캐시에 업데이트
+      queryClient.setQueryData(['todos', updatedTodo.id], updatedTodo);
+    },
+    onError: error => {
+      console.log('업데이트에 실패했습니다.', error);
+    },
+  });
+}
+
+// 할일 삭제하는 뮤테이션 훅
+export function useDeleteTodo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      // 실제 API 테스트 못하므로 데모용으로
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return id;
+    },
+    onSuccess: deletedId => {
+      // 해당 할일 쿼리를 무효화
+      queryClient.invalidateQueries({ queryKey: ['todos', deletedId] });
+      queryClient.invalidateQueries({ queryKey: ['todos'] });
+    },
+    onError: error => {
+      console.log('삭제에 실패했습니다.', error);
+    },
+  });
+}
+
+// 할일 토글 뮤테이션 훅
+export function useToggleTodo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      // 실제 API 테스트 못하므로 데모용으로
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // 현재 할일 정보를 가져와서 상태를 토글
+      // 아래 내용 즉, getQueryData 의 용도를 파악해 두자.
+      // - api 호출 없이 React Query 의 캐시데이터를 직접 가져오는 방법
+      const currentTodos = queryClient.getQueryData<Todo[]>(['todos']);
+      const todo = currentTodos?.find(item => item.id === id);
+
+      if (!todo) {
+        throw new Error('없는 Todo 입니다.');
+      }
+      return {
+        ...todo,
+        completed: !todo.completed,
+      };
+    },
+    onSuccess: toggledTodo => {
+      // 해당 할일 쿼리를 무효화
+      queryClient.invalidateQueries({ queryKey: ['todos', toggledTodo.id] });
+      // 할일 목록 쿼리를 무효화
+      queryClient.invalidateQueries({ queryKey: ['todos'] });
+      // 토글된 할일을 캐시에 업데이트
+      queryClient.setQueryData(['todos', toggledTodo.id], toggledTodo);
+    },
+    onError: error => {
+      console.log('토글에 실패했습니다.', error);
+    },
+  });
+}
+```
+
+## 7. React Query 와 Zustand 통합
+
+### 7.1. 통합 훅 만들기
+
+- `src/stores/queryStore.ts 파일 ` 생성
+
+```ts
+// React Query의 상태를 Zustand 에서 관리하기 위한 스토어
+
+import { QueryState } from '@/types/types';
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+// 1. 타입 정의
+// interface QueryState {
+//   // state
+//   selectedUserId: number | null; // 현재 선택된 사용자 ID
+//   selectedPostId: number | null; // 현재 선택된 게시글 ID
+//   // action
+//   setSelectedUserId: (userId: number | null) => void; // 선택된 사용자 ID 설정
+//   setSelectedPostId: (postId: number | null) => void; // 선택된 게시글 ID 설정
+// }
+// 2. localStorage 로 생성
+const queryLocalState = create<QueryState>()(
+  persist(
+    set => ({
+      // 초기 state 설정
+      selectedUserId: null, // 처음에 선택된 사용자 ID 없음
+      selectedPostId: null, // 처음에 선택된 게시글 ID 없음
+      // 초기 action 기능 설정
+      setSelectedUserId: (userId: number | null) => {
+        set({ selectedUserId: userId });
+      },
+      setSelectedPostId: (postId: number | null) => {
+        set({ selectedPostId: postId });
+      },
+    }),
+    {
+      name: 'query-storage', // localStorage 에 저장될 키 이름
+      partialize: () => {
+        //localStorage 에 보관할 state 지정 가능
+      },
+    }
+  )
+);
+// 3. hook 정의
+export const useQueryStore = () => {
+  const {
+    selectedPostId,
+    setSelectedPostId,
+    selectedUserId,
+    setSelectedUserId,
+  } = queryLocalState();
+  return {
+    selectedPostId,
+    setSelectedPostId,
+    selectedUserId,
+    setSelectedUserId,
+  };
+};
+```
+
+- `src/hooks/useQueryIntegration.ts 파일 ` 생성
+
+```ts
 
 ```
+
+### 7.2. 컴포넌트 생성 및 적용하고 테스트 하기

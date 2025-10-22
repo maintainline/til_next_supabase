@@ -56,3 +56,13 @@ export interface TodoState {
   clearCompleted: () => void; // 완료된 할일 모두 삭제
   getFilteredTodos: () => Todo[]; // 현재 선택된 할일 목록만 반환
 }
+
+// React Qyery Store 타입정의
+export interface QueryState {
+  // state
+  selectedUserId: number | null; // 현재 선택된 사용자 ID
+  selectedPostId: number | null; // 현재 선택된 게시글 ID
+  // action
+  setSelectedUserId: (userId: number | null) => void; // 선택된 사용자 ID 설정
+  setSelectedPostId: (postId: number | null) => void; // 선택된 게시글 ID 설정
+}
