@@ -1,10 +1,14 @@
-import ReactQueryDemo from '@/components/ReactQueryDemo';
+import { Button } from '@/components/ui/button';
 
 export default function Home() {
   return (
     <div>
-      <h2>React Query</h2>
-      <ReactQueryDemo />
+      <Button>버튼</Button>
+      <Button variant={'destructive'}>버튼</Button>
+      <Button variant={'secondary'}>버튼</Button>
+      <Button variant={'outline'}>버튼</Button>
+      <Button variant={'ghost'}>버튼</Button>
+      <Button variant={'link'}>버튼</Button>
     </div>
   );
 }

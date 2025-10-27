@@ -5,7 +5,7 @@ QueryClient 를 App 전체에 제공함
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools/production';
 import { useState } from 'react';
 
 export default function QueryProvider({
