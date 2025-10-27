@@ -1,57 +1,80 @@
-# Supabase 셋팅
+# 테이블 셋팅해보기
 
-## 1. 새로운 계정 이메일 준비
+## 1. posts 테이블 생성해보기
 
-- 프로젝트 셋팅
+- 게시글을 보관하는 용도
+- Table Editor > New Table
 
-## 2. `.env 파일` 생성 및 설정
+## 2. 칼럼 구조
 
-- 화면 최상단의 `connect` 버튼 선택 후 내용 작성
+- id : 글의 아이디 / int8 / Not Null
+- crated_at : 생성날짜 / timestampz / Not Null
+- content : 내용 / text / Not Null
+- image_urls : 게시글에 여러 이미지경로를 문자열로 관리/ text / Nullable / Array
+- like_count : 좋아요수 / int8 / 0 / Not Null
+- author_id : 작성자 / uuid / auth.uid() / Not Null
 
+## 3. Supabase CLI 설치 : 테이블에 대한 types.ts 생성 목적
+
+- 새로운 이메일로 로그인 후에 진행.
+
+```bash
+npx supabase login
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://프로젝트ID.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=본인키
+
+- 웹브라우저에 출력된 키 복사후 Terminal 에 붙여넣고 Enter 키 입력
+
+```bash
+Enter your verification code: 키값 입력
 ```
 
-## 3. supabase 관련 파일 작성
+## 4. package.json 추가
 
-- Connect 메뉴에서는 utils 폴더 추천함.
-- 우리는 lib 폴더를 사용함
-  `/src/lib/supabase`폴더 생성
+- supabase 타입 자동 생성 스크립트 추가
+- `/src/types 폴더 `생성
 
-### 3.1. `client.ts 파일` 생성
+```json
+ "generate-types": "npx supabase gen types typescript --project-id 프로젝트아이디 > src/types/database.types.ts"
+```
 
-- 클라이언트(웹 브라우저) 코드
-- 브라우저 환경에서 supabase 와 통신함
-- React 컴포넌트(클라이언트 컴포넌트)에서 직접 사용함.
+```bash
+npm run generate-types
+```
+
+## 5. 타입 활용
+
+- `/src/lib/supabase/client.ts` 업데이트
+- Supabase 연동시 타입을 자동 추론하는데 도움을 주기위한 처리
 
 ```ts
+import { Database } from '@/types/database.types';
 import { createBrowserClient } from '@supabase/ssr';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const createClient = () =>
-  createBrowserClient(supabaseUrl!, supabaseKey!);
+  createBrowserClient<Database>(supabaseUrl!, supabaseKey!);
 ```
 
-### 3.2. `server.ts 파일` 생성
+## 6. `/src/lib/supabase/server.ts` 업데이트
 
-- 서버 컴포넌트에서 Supabase 통신함.
-- 쿠키 기반 인증 처리
-- SSR/SSG 환경에서 사용
-- SSR : Server Side Rendering(서버에서 html 생성)
-- SSG : Server Static Generating(서버에서 미리 html 생성)
+- Next.js 15 부터 cookies( )가 비동기로 변경됨.
+- 현재 Connet 예시에는 반영안되어 있음.
 
 ```ts
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { Database } from '@/types/database.types';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const createClient = (cookieStore: ReturnType<typeof cookies>) => {
-  return createServerClient(supabaseUrl!, supabaseKey!, {
+export const createClient = async () => {
+  // 최신 문법 처리
+  const cookieStore = await cookies();
+
+  return createServerClient<Database>(supabaseUrl!, supabaseKey!, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -72,72 +95,15 @@ export const createClient = (cookieStore: ReturnType<typeof cookies>) => {
 };
 ```
 
-### 3.3. `middleware.ts 파일` 생성
+## 7. 테이블의 타입을 별도 관리
 
-- 통신 중간 단계를 처리해서 전달해주는 기계를 `미들웨어`라고 함.
-- Next.js 의 미들웨어에서 사용함.
-- 인증 상태 및 리다이렉션 처리
+- `src/types/types.ts 파일` 생성
 
 ```ts
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { type NextRequest, NextResponse } from 'next/server';
+import { type Database } from './database.types';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-export const createClient = (request: NextRequest) => {
-  // Create an unmodified response
-  let supabaseResponse = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
-
-  const supabase = createServerClient(supabaseUrl!, supabaseKey!, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) =>
-          request.cookies.set(name, value)
-        );
-        supabaseResponse = NextResponse.next({
-          request,
-        });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          supabaseResponse.cookies.set(name, value, options)
-        );
-      },
-    },
-  });
-
-  return supabaseResponse;
-};
-```
-
-## 4. 필요한 라이브러리
-
-```bash
-npm i @supabase/ssr
-```
-
-## 5. 참조사항
-
-- 만약 React 프로젝트라면
-
-```bash
-npm i @supabase/supabase-js
-```
-
-## 6. Service Role 키도 보관해 두자.
-
-- 필수 아닙니다.
-- Project Settings > API Keys > Service_Role
-- `.env` 내용 추가
-
-```
-NEXT_PUBLIC_SUPABASE_URL=https://프로젝트ID.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY= 본인 키
-NEXT_PUBLIC_SUPABASE_SERVICE_ROLE= 시크릿키
+export type PostEntity = Database['public']['Tables']['posts']['Row'];
+export type InsertPostEntity = Database['public']['Tables']['posts']['Insert'];
+export type UpdatePostEntity = Database['public']['Tables']['posts']['Update'];
+export type PostTableEntity = Database['public']['Tables']['posts'];
 ```
