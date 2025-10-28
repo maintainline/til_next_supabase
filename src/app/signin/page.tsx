@@ -12,7 +12,11 @@ function SignIn() {
   const [password, setPassword] = useState('');
   //이메일로 로그인
   const { mutate: signInPassword, isPending: isPendingPassword } =
-    useSignInWithPassword();
+    useSignInWithPassword({
+      onError: () => {
+        setPassword('');
+      },
+    });
 
   const handleSignInWithEmail = () => {
     if (!email.trim()) return;
