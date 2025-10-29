@@ -1,4 +1,42 @@
 import { create } from 'zustand';
+import { combine } from 'zustand/middleware';
+
+// create( combine( 스토어에 포함될 state 객체, 콜백함수 ) );
+// create( combine( {count:0}, 콜백함수 ) );
+// create( combine( {count:0},()=>{} ) );
+// create( combine( {count:0},(set,get)=>리턴객체 ) );
+create( combine( {count:0},(set,get)=>(리턴객체) ) );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 type CountStoreType = {
   count: number;
