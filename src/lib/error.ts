@@ -1,23 +1,5 @@
-# Supabase 인증 에러 한글로 변환
+import { AuthError } from '@supabase/auth-js';
 
-- 영어 메세지라서 문구를 현지화 하는 것이 좋다.
-- Next.js 에서는 웹 브라우저에 사용자 위치 지역으로 국가를 감지
-- 다국어로 UI 텍스트를 적용가능(next-i18next)
-
-## 1. supabase 의 메세지를 교체
-
-### 1.1. 에러 메세지의 타입 확인하기(`ErrorCode`)
-
-- `/src/apis/auth.ts`
-- error 의 타입 : `error : AuthError`
-- error 의 메세지 타입 : `export type ErrorCode`
-
-### 1.2. ErrorCode 를 한글로 교체하기 위한 타입 별도 정의
-
-- `src/lib/error.ts 파일` 생성
-- `실제 에러메세지`를 `key 처럼 활용`하여 처리함.
-
-```ts
 const AUTH_ERROR_MESSAGE_MAP: Record<string, string> = {
   unexpected_failure:
     '예기치 못한 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
@@ -109,148 +91,14 @@ const AUTH_ERROR_MESSAGE_MAP: Record<string, string> = {
   email_address_not_authorized: '허용되지 않은 이메일 주소입니다.',
   email_address_invalid: '유효하지 않은 이메일 주소입니다.',
 };
-```
 
-### 1.3. ErrorCode 를 이용해서 메세지 매칭을 하는 함수 정의
-
-- `/src/lib/error.ts` 업데이트
-
-```ts
-import { AuthError } from '@supabase/auth-js';
-```
-
-```ts
 export function getErrorMessage(error: unknown) {
   if (error instanceof AuthError && error.code) {
     return (
       AUTH_ERROR_MESSAGE_MAP[error.code] ??
-      '에러가 발생했습니다. 잠시 후 시도해 주세요'
+      '에러가 발생했습니다. 잠시 후 시도해주세요.'
     );
   }
 
-  return '에러가 발생했습니다. 잠시 후 시도해 주세요';
+  return '에러가 발생했습니다. 잠시 후 시도해주세요.';
 }
-```
-
-## 2. 로그인 에러 적용하기
-
-### 2.1. 이메일
-
-- `/src/app/signin/page.tsx`
-
-```tsx
-// 이메일로 로그인
-const { mutate: signInPassword, isPending: isPendingPassword } =
-  useSignInWithPassword({
-    onError: error => {
-      setPassword('');
-      // Sonner 로 띄우기
-      // 한글 메시지로 교체
-      const message = getErrorMessage(error);
-      toast.error(message, { position: 'top-center' });
-    },
-  });
-```
-
-### 2.2. 카카오
-
-```tsx
-// 카카오 로그인
-const { mutate: signInWithKakao, isPending: isPendingKakao } =
-  useSignInWithKakao({
-    onError: error => {
-      // Sonner 로 띄우기
-      // 한글 메시지로 교체
-      const message = getErrorMessage(error);
-      toast.error(message, { position: 'top-center' });
-    },
-  });
-```
-
-- `/src/hooks/mutations/useSignInWithKakao.ts`
-
-```ts
-import { signInWithOAuth } from '@/apis/auth';
-import { UseMutationCallback } from '@/types/types';
-import { useMutation } from '@tanstack/react-query';
-
-export function useSignInWithKakao(callback?: UseMutationCallback) {
-  return useMutation({
-    mutationFn: signInWithOAuth,
-    // 자동으로 error 전달받음
-    onError: error => {
-      console.error(error);
-      if (callback?.onError) callback.onError(error);
-    },
-  });
-}
-```
-
-### 2.3. 구글
-
-```tsx
-// 구글 로그인
-const { mutate: signInWithGoogle, isPending: isPendingGoogle } =
-  useSignInWithGoogle({
-    onError: error => {
-      // Sonner 로 띄우기
-      // 한글 메시지로 교체
-      const message = getErrorMessage(error);
-      toast.error(message, { position: 'top-center' });
-    },
-  });
-```
-
-- `/src/hooks/mutations/useSignInWithGoogle.ts`
-
-```ts
-import { signInWithOAuth } from '@/apis/auth';
-import { UseMutationCallback } from '@/types/types';
-import { useMutation } from '@tanstack/react-query';
-
-export function useSignInWithGoogle(callback?: UseMutationCallback) {
-  return useMutation({
-    mutationFn: signInWithOAuth,
-    // 자동으로 error 전달받음
-    onError: error => {
-      console.error(error);
-      if (callback?.onError) callback.onError(error);
-    },
-  });
-}
-```
-
-## 3. 회원 가입 에러 적용하기
-
-- `/src/app/signup/page.tsx`
-
-```tsx
-// Mutation Hook 활용하기
-// 1. 이메일 mutation 훅
-const { mutate, isPending } = useSignUp({
-  onError: error => {
-    const message = getErrorMessage(error);
-    toast.error(message, { position: 'top-center' });
-  },
-});
-```
-
-- `/src/hooks/mutation/useSignUp.ts` 업데이트
-
-```ts
-import { signUpWithEmail } from '@/apis/auth';
-import { useMutationCallback } from '@/types/types';
-import { useMutation } from '@tanstack/react-query';
-
-export function useSignUp(callback?: useMutationCallback) {
-  return useMutation({
-    mutationFn: signUpWithEmail,
-    // 자동으로 error 전달받음
-    onError: error => {
-      console.error(error.message);
-      if (callback?.onError) callback.onError(error);
-    },
-  });
-}
-```
-
