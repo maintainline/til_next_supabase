@@ -1,3 +1,4 @@
+// 첫화면
 import { Button } from '@/components/ui/button';
 
 export default function Home() {
