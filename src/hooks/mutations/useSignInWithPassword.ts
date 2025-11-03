@@ -1,8 +1,8 @@
 import { signInWithPassword } from '@/apis/auth';
-import { useMutationCallback } from '@/types/types';
+import { UseMutationCallback } from '@/types/types';
 import { useMutation } from '@tanstack/react-query';
 
-export function useSignInWithPassword(callback?: useMutationCallback) {
+export function useSignInWithPassword(callback?: UseMutationCallback) {
   return useMutation({
     mutationFn: signInWithPassword,
     // 자동으로 error 전달받음

@@ -13,13 +13,13 @@ function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  //이메일로 로그인
+  // 이메일로 로그인
   const { mutate: signInPassword, isPending: isPendingPassword } =
     useSignInWithPassword({
       onError: error => {
         setPassword('');
-        // sonner 로 띄우기
-        // 한글 메세지로 교체
+        // Sonner 로 띄우기
+        // 한글 메시지로 교체
         const message = getErrorMessage(error);
         toast.error(message, { position: 'top-center' });
       },
@@ -36,9 +36,8 @@ function SignIn() {
   const { mutate: signInWithKakao, isPending: isPendingKakao } =
     useSignInWithKakao({
       onError: error => {
-        setPassword('');
-        // sonner 로 띄우기
-        // 한글 메세지로 교체
+        // Sonner 로 띄우기
+        // 한글 메시지로 교체
         const message = getErrorMessage(error);
         toast.error(message, { position: 'top-center' });
       },
@@ -52,15 +51,15 @@ function SignIn() {
   const { mutate: signInWithGoogle, isPending: isPendingGoogle } =
     useSignInWithGoogle({
       onError: error => {
-        setPassword('');
-        // sonner 로 띄우기
-        // 한글 메세지로 교체
+        // Sonner 로 띄우기
+        // 한글 메시지로 교체
         const message = getErrorMessage(error);
         toast.error(message, { position: 'top-center' });
       },
     });
+
   const handleSignInWithGoogle = () => {
-    signInWithGoogle('google');
+    signInWithKakao('google');
   };
 
   return (
@@ -76,10 +75,10 @@ function SignIn() {
           placeholder='example@example.com'
         />
         <Input
-          type='password'
           value={password}
-          disabled={isPendingPassword}
           onChange={e => setPassword(e.target.value)}
+          disabled={isPendingPassword}
+          type='password'
           className='py-6'
           placeholder='password'
         />
@@ -95,23 +94,22 @@ function SignIn() {
         </Button>
         {/* 카카오 소셜 로그인 */}
         <Button
+          className='w-full cursor-pointer'
           onClick={handleSignInWithKakao}
           disabled={isPendingKakao}
-          className='w-full cursor-pointer'
         >
           카카오 계정 로그인
         </Button>
 
         {/* 구글 소셜 로그인 */}
         <Button
+          className='w-full cursor-pointer'
           onClick={handleSignInWithGoogle}
           disabled={isPendingGoogle}
-          className='w-full cursor-pointer'
         >
           구글 계정 로그인
         </Button>
       </div>
-
       <div className='flex flex-col gap-2'>
         <Link
           className='text-muted-foreground hover:underline'
@@ -119,7 +117,6 @@ function SignIn() {
         >
           계정이 없으시다면? 회원가입
         </Link>
-
         <Link
           className='text-muted-foreground hover:underline'
           href={'/forget-password'}

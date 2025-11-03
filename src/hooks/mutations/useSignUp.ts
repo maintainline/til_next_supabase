@@ -1,11 +1,10 @@
 import { signUpWithEmail } from '@/apis/auth';
-import { useMutationCallback } from '@/types/types';
+import { UseMutationCallback } from '@/types/types';
 import { useMutation } from '@tanstack/react-query';
 
-export function useSignUp(callback?: useMutationCallback) {
+export function useSignUp(callback?: UseMutationCallback) {
   return useMutation({
     mutationFn: signUpWithEmail,
-    // 자동으로 error 전달받음
     onError: error => {
       console.error(error.message);
       if (callback?.onError) callback.onError(error);

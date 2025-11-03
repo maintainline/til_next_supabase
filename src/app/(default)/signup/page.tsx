@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useSignUp } from '@/hooks/mutations/useSignUp';
 import { getErrorMessage } from '@/lib/error';
+import { error } from 'console';
 import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -54,7 +55,7 @@ function SignUp() {
           className='w-full'
           onClick={handleSignUpClick}
         >
-          {isPending ? '회원등록중..' : '회원가입'}
+          {isPending ? '회원등록중...' : '회원가입'}
         </Button>
       </div>
       <div>

@@ -5,8 +5,8 @@ export type InsertPostEntity = Database['public']['Tables']['posts']['Insert'];
 export type UpdatePostEntity = Database['public']['Tables']['posts']['Update'];
 export type PostTableEntity = Database['public']['Tables']['posts'];
 
-export type useMutationCallback = {
-  onError: (error: Error) => void;
+export type UseMutationCallback = {
+  onError?: (error: Error) => void;
   onSuccess?: () => void;
   onMutate?: () => void;
   onSettled?: () => void;

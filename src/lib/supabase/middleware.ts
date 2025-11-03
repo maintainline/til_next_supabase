@@ -31,5 +31,7 @@ export const createClient = (request: NextRequest) => {
     },
   });
 
-  return supabaseResponse;
+  // supabase : 활용을 위해서 리턴함
+  // response : 쿠키(Auth 인증관련 키값이 포함되어 있음)가 들어있는 응답을 리턴함.
+  return { supabase, response: supabaseResponse };
 };
