@@ -17,19 +17,7 @@ export default function QueryProvider({
   // 현재 Next.js 에다가 셋팅을 진행함.
   // 서버 사이드 렌더링을 위한 QueryClient 인스턴스 생성
   // 각 요청마다 새로운 QueryClient 를 생성하여 상태 구분함.
-  const [client, setClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            // 서버 사이드에서는 즉시 staleTime을 0으로 처리
-            staleTime: 0,
-            // 서버 사이드에서는 캐시하지 않음
-            gcTime: 0,
-          },
-        },
-      })
-  );
+  const [client, setClient] = useState(() => new QueryClient());
 
   return (
     <QueryClientProvider client={client}>

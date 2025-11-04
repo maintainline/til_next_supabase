@@ -1,532 +1,500 @@
-# 비밀번호 찾기
+# 프로필 추가를 위한 테이블 생성
 
-## 1. 사전 준비
+## 1. 테이블 구성
 
-- `/src/app/(default)/signin/page.tsx` 업데이트
+- `profiles`
+- `sns 서비스 회원프로필`
+- RLS 해제
 
-```tsx
-<div className='flex flex-col gap-2'>
-  <Link className='text-muted-foreground hover:underline' href={'/signup'}>
-    계정이 없으시다면? 회원가입
-  </Link>
-  <Link
-    className='text-muted-foreground hover:underline'
-    href={'/forget-password'}
-  >
-    비밀번호를 잊으셨나요?
-  </Link>
-</div>
+## 2. 칼럼 구성
+
+- id : `uuid`, `auth.uid()`
+- created_at : 기본
+- nickname : `text`, `EMPTY`,`Not Null`
+- bio : `text`, `EMPTY`,`Not Null`
+- avatar_url : `text`
+- role : `text`, "MEMBER", `Not Null`
+- 반드시 save 버튼을 클릭하자.
+
+## 3. Type Script 데이터형 출력
+
+- 터미널 작업 (supabase 사이트 로그인 후 진행)
+
+```bash
+npx supabase login
 ```
 
-- `/src/app/(default)/forget-password/page.tsx`
-- UI 작업
+- 로그인 인증 이후 타입출력
 
-```tsx
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-
-export default function ForgetPassword() {
-  return (
-    <div className='flex flex-col gap-8'>
-      <div className='flex flex-col gap-1'>
-        <div className='text-xl font-bold'>비밀번호를 잊으셨나요?</div>
-        <div className='text-muted-foreground'>
-          이메일 비밀번호를 재설정 할 수 있는 인증 링크를 보내드립니다.
-        </div>
-      </div>
-      <Input className='py-6' type='email' placeholder='example@example.com' />
-      <Button className='w-full'>인증 메일 요청하기</Button>
-    </div>
-  );
-}
+```bash
+npm run generate-types
 ```
 
-## 2. 컴포넌트 state 작업
+- `src/types/database.types.ts`확인
 
-- /src/app/forget-password/page.tsx
+## 4. profiles 타입정의 작성
+
+- `src/types/types.ts` 업데이트
+
+## 5. 회원 프로필 자동 추가 관련
+
+### 5.1. DB 트리거
+
+- 일반적으로 회원가입후 자동으로 DB에서 트리거를 통해 회원정보 입력이 기본
+- `트리거` 는JS 의 이벤트 핸들러라고 생각하면 된다.
+- 어떤 이벤트가 발생하면 이후 자동으로 실행되는 함수를 말함.
+- DB 에 사용자가 추가되면 `새로은 profiles 에 데이터를 입력하라`는것
+- DB 전문가가 있는 경우 일반적으로 진행하는 형태
+
+### 5.2. `트리거` 의 문제점
+
+- 트리거가 에러시 대응이 어렵습니다.
+- `DB 전문가가 디버깅`을 하는 어려움이 있음.
+- 리액트에서 처리를 하여도 됩니다.
+- 최대한 안전하게 그리고 대응이 수월하도록 React 에서 처리함.
+
+## 6. 애플리케이션에서 처리하는 과정
+
+- 회원가입 완료
+- 완료 후 나의 프로필이 있는지 profiles 테이블에 조회진행(select)
+- 조회의 결과가 없다면
+- 프로필을 생성하는 단계 요청
+- 데이터 조회의 과정은 `useQuery` 로 진행
+- 데이터 입력의 과정은 `useMutation` 으로 진행
+
+# useQuery 의 이해
+
+## 1. React Query
+
+- `서버의 상태를 관리`함
+- 대표적인 `서버의 상태`
+  : 로딩상태(isLoading)
+  : 성공, 실패상태(status)
+  : 에러객체(error)
+  : 캐시상태(cacheOption)
+- 설치 : `npm i @tanstack/react-query`
+
+## 2. React Query 설정
+
+- `src/components/provider/QueryProvider.tsx`
+
+```tsx
+const [client, setClient] = useState(() => new QueryClient());
+```
+
+- 적용 : `/src/app/layout.tsx` 적용
+
+## 3.실습용 서버 URL
+
+- https://jsonplaceholder.typicode.com/
+
+## 4. 데이터 조회 요청관리
+
+### 4.1. 실습 예제 구성
+
+- `/src/components/todo 폴더` 생성
+- `/src/components/todo/TodoEditor.tsx 파일` 생성
 
 ```tsx
 'use client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useState } from 'react';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 
-export default function ForgetPassword() {
-  // 컴포넌트 state
-  const [email, setEmail] = useState('');
-  // 이메일 전송 이벤트 핸들러
-  const handleEmailSendClick = () => {
-    if (email.trim() === '') return;
-    console.log(email);
+const TodoEditor = () => {
+  const [content, setContent] = useState('');
+  const handleAddClick = () => {
+    if (content.trim() === '') return;
+    setContent('');
   };
+  return (
+    <div className='flex gap-2'>
+      <Input
+        value={content}
+        onChange={e => setContent(e.target.value)}
+        placeholder='새로운 할 일을 입력하세요 ...'
+      />
+      <Button onClick={handleAddClick}>추가</Button>
+    </div>
+  );
+};
+
+export default TodoEditor;
+```
+
+- `/src/components/todo/TodoItem.tsx 파일` 생성
+
+```tsx
+'use client';
+import { Button } from '../ui/button';
+
+export default function TodoItem({
+  id,
+  content,
+}: {
+  id: number;
+  content: string;
+}) {
+  const handleDeleteClick = () => {};
 
   return (
-    <div className='flex flex-col gap-8'>
-      <div className='flex flex-col gap-1'>
-        <div className='text-xl font-bold'>비밀번호를 잊으셨나요?</div>
-        <div className='text-muted-foreground'>
-          이메일 비밀번호를 재설정 할 수 있는 인증 링크를 보내드립니다.
-        </div>
-      </div>
-      <Input
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        className='py-6'
-        type='email'
-        placeholder='example@example.com'
-      />
-      <Button onClick={handleEmailSendClick} className='w-full'>
-        인증 메일 요청하기
+    <div className='flex items-center justify-between border p-2'>
+      {content}
+      <Button onClick={handleDeleteClick} variant={'destructive'}>
+        삭제
       </Button>
     </div>
   );
 }
 ```
 
-## 3. api 구현하기
+### 4.2. 페이지 구성
 
-- `/src/apis/auth.ts` 업데이트
-- /auth/callback?next=`비밀번호 수정될 라우터 경로`
-- env : `NEXT_PUBLIC_APP_URL=http://localhost:3000` 추가
+- `src/app/todo-list 폴더` 생성
+- `src/app/todo-list/page.tsx 파일` 생성
 
-```ts
-// supabase 의 비밀번호 찾기 이메일을 전송함.
-export async function requestPasswordResetEmail({ email }: { email: string }) {
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/reset-password`,
-  });
-  if (error) throw error;
-  return data;
+```tsx
+import TodoEditor from '@/components/todo/TodoEditor';
+import TodoItem from '@/components/todo/TodoItem';
+
+export default function TodoListPage() {
+  return (
+    <div className='flex flex-col gap-5 p-5'>
+      <h1 className='text-2xl font-bold'>Todo List</h1>
+      <TodoEditor />
+      <div className='flex flex-col gap-2'>
+        <TodoItem id={1} content='Todo 1' />
+        <TodoItem id={2} content='Todo 2' />
+        <TodoItem id={3} content='Todo 3' />
+      </div>
+    </div>
+  );
 }
 ```
 
-## 4. /auth/callback 처리
+## 5. 비동기 API 구성
 
-- Supabase 의 Auth 인증 처리해 주는 역할
-- `/src/app/auth 폴더` 생성
-- `/src/app/auth/callback 폴더` 생성
+### 5.1. 기존 방식
 
-### 4.1. page.tsx 말고 `route.ts` 생성에 대한 이해
+- 직접 개발자가 API 를 다루어줌
+- `/src/app/todo-list/page.tsx`
 
-- page.tsx 는 화면의 UI 출력
-- Next.js 에서는 route 만 처리하는 파일명이 별도로 존재함.
-- route.ts 는 UI 를 리턴하지 않음.
-- route.ts 는 Next.js 의 App Router 처리를 진행함.
-- route.ts 는 HTTP 메서드를 처리함.
-- route.ts 는 NextRequest, NextResponse 를 처리함.
-- route.ts 는 오로지 서버 컴포넌트에서만 작성 가능.
-- Supabase 는 웹브라우저에서 처리됨.
-- Next.js 는 서버라서 웹브라우저에 접근이 불가하다.
-- 즉, 웹브라우저에 보관해주어야 할 Supabase 의 쿠키를 생성못함
-- 그래서 Next.js 에서 조금 복잡한 과정으로 Supabase 인증 키를 구워주어야 함.
-- 그래서 route.ts 를 활용함.
+```tsx
+'use client';
+import TodoEditor from '@/components/todo/TodoEditor';
+import TodoItem from '@/components/todo/TodoItem';
+import { useEffect, useState } from 'react';
 
-### 4.2. route.ts 구현
+type Todo = {
+  id: number;
+  userId: number;
+  title: string;
+  completed: boolean;
+};
 
-```ts
-// 아래는 주의사항 : 왜냐하면 서버에서 클라이언트로 접근해야함
-import { createClient } from '@/lib/supabase/server';
-import { NextRequest, NextResponse } from 'next/server';
-// 사용자가 로그인을 하고 난 다음에 돌아오는 처리
-// 전달받은 url 의 ? 즉 쿼리스트링 다음에 내용을 파악해서 처리
-// /auth/callback     ?    next=/reset-password
-export async function GET(request: NextRequest) {
-  // 사용자가 들어온 주소를 파악함.
-  const url = new URL(request.url);
-  // 주소에서 code 라는 값을 뜯어냄
-  // code 에 값은 supabase 에서 만들어줌
-  const code = url.searchParams.get('code');
-  const next = url.searchParams.get('next') || '/';
+// API 함수로 할일 목록 전체 불러들이기 기능
+async function fetchTodos() {
+  const response = await fetch('https://jsonplaceholder.typicode.com/todos');
+  if (!response.ok) throw new Error('목록을 가져오는데 실패함');
+  const todos: Todo[] = await response.json();
+  return todos;
+}
 
-  // code 가 없으면 로그인 과정에 문제가 있는 거라서 로그인 페이지로 이동
-  if (!code) {
-    return NextResponse.redirect(
-      new URL('/signin?error=missing_code', request.url)
-    );
-  }
+export default function TodoListPage() {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  // code 가 존재하면 Supabase 서버 연결 라이브러리로 생성함.
-  const supabase = await createClient();
-  // code 가 존재하면 진짜 로그인 세션으로 바꿔달라는 요청을 Supabase 에 전달함.
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error) {
-    return NextResponse.redirect(
-      new URL('/signin?error=exchange_failed', request.url)
-    );
-  }
-  // 성공했다면 사용자가 가고 싶은 곳으로 간다.
-  // next=/reset-password
-  return NextResponse.redirect(new URL(next, request.url));
+  // api 함수 호출
+  const getTodos = async () => {
+    setIsLoading(true);
+    try {
+      const result = await fetchTodos();
+      setTodos(result);
+    } catch (error) {
+      setError(error as Error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // api 호출
+    getTodos();
+  }, []);
+  return (
+    <div className='flex flex-col gap-5 p-5'>
+      <h1 className='text-2xl font-bold'>Todo List</h1>
+      <TodoEditor />
+      <div className='flex flex-col gap-2'>
+        {todos.map(item => (
+          <TodoItem key={item.id} id={item.id} content={item.title} />
+        ))}
+      </div>
+    </div>
+  );
 }
 ```
 
-## 5. Supabase 의 createClient() 종류
+### 5.2. useQuery 로 진행해봄.
 
-- /src/lib/supabase/client.ts : 클라이언트 컴포넌트에서 활용(웹브라우저용)
-- /src/lib/supabase/server.ts : 서버 컴포넌트에서 활용(서버용), 비동기(await)
-- /src/lib/supabase/middleware.ts : Next.js 와 연동하는 경우 활용, 동기
+- `src/app/todo-list/page.tsx 파일` 생성
 
-## 6. supabase의 middleware.ts
+```tsx
+'use client';
+import TodoEditor from '@/components/todo/TodoEditor';
+import TodoItem from '@/components/todo/TodoItem';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 
-- 화면에 페이지 즉, app/layout.tsx 를 그려내기 전에 사전에 처리가 필요
-- `/src/lib/supabase/middleware.ts` 리턴값 업데이트
-- 쿠키 관리, Next.js 의 middleware 에 활용
+type Todo = {
+  id: number;
+  userId: number;
+  title: string;
+  completed: boolean;
+};
+
+// API 함수로 할일 목록 전체 불러들이기 기능
+async function fetchTodos() {
+  const response = await fetch('https://jsonplaceholder.typicode.com/todos');
+  if (!response.ok) throw new Error('목록을 가져오는데 실패함');
+  const todos: Todo[] = await response.json();
+  return todos;
+}
+
+export default function TodoListPage() {
+  const {
+    data: todos,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['todos'],
+    queryFn: fetchTodos,
+  });
+  if (isLoading) return <div>로딩중 ...</div>;
+  if (error) return <div>에러입니다: {error.message}</div>;
+  if (!todos) return <div>데이터가 없습니다.</div>;
+
+  return (
+    <div className='flex flex-col gap-5 p-5'>
+      <h1 className='text-2xl font-bold'>Todo List</h1>
+      <TodoEditor />
+      <div className='flex flex-col gap-2'>
+        {todos.map(item => (
+          <TodoItem key={item.id} id={item.id} content={item.title} />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### 5.3. retry 옵션
+
+- 기본값은 4회 호출해줌
+- retry 동안 `isLoading` 으로 처리됨.
+- 일시적으로 네트워크 오류거나 서버가 느려지는 경우 자동으로 재요청을 합니다.
+
+```tsx
+'use client';
+import TodoEditor from '@/components/todo/TodoEditor';
+import TodoItem from '@/components/todo/TodoItem';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+
+type Todo = {
+  id: number;
+  userId: number;
+  title: string;
+  completed: boolean;
+};
+
+// API 함수로 할일 목록 전체 불러들이기 기능
+async function fetchTodos() {
+  const response = await fetch('https://jsonplaceholder.typicode.com/todos');
+  if (!response.ok) throw new Error('목록을 가져오는데 실패함');
+  const todos: Todo[] = await response.json();
+  return todos;
+}
+
+export default function TodoListPage() {
+  const {
+    data: todos,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['todos'],
+    queryFn: fetchTodos,
+    retry: 3,
+  });
+  if (isLoading) return <div>로딩중 ...</div>;
+  if (error) return <div>에러입니다: {error.message}</div>;
+  if (!todos) return <div>데이터가 없습니다.</div>;
+
+  return (
+    <div className='flex flex-col gap-5 p-5'>
+      <h1 className='text-2xl font-bold'>Todo List</h1>
+      <TodoEditor />
+      <div className='flex flex-col gap-2'>
+        {todos.map(item => (
+          <TodoItem key={item.id} id={item.id} content={item.title} />
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### 5.4. 기능별 파일 분리
+
+- type 분리 :`src/apis/todo-type.ts 파일` 생성
 
 ```ts
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { type NextRequest, NextResponse } from 'next/server';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-export const createClient = (request: NextRequest) => {
-  // Create an unmodified response
-  let supabaseResponse = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
-
-  const supabase = createServerClient(supabaseUrl!, supabaseKey!, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) =>
-          request.cookies.set(name, value)
-        );
-        supabaseResponse = NextResponse.next({
-          request,
-        });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          supabaseResponse.cookies.set(name, value, options)
-        );
-      },
-    },
-  });
-
-  // supabase : 활용을 위해서 리턴함
-  // response : 쿠키(Auth 인증관련 키값이 포함되어 있음)가 들어있는 응답을 리턴함.
-  return { supabase, response: supabaseResponse };
+export type Todo = {
+  id: number;
+  userId: number;
+  title: string;
+  completed: boolean;
 };
 ```
 
-## 7. Next.js 의 middleware
-
-- 반드시 `middleware.ts` 라는 파일명은 약속되어있음.
-- 예) layout.tsx, page.tsx, loading.tsx....
-- 파일의 위치가 고정이 되어있음. (`/src/middleware.ts` 고정)
+- API 분리 : `src/apis/todo.ts 파일` 생성
 
 ```ts
-import { type NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/middleware';
+import { Todo } from './todo-type';
 
-export async function middleware(request: NextRequest) {
-  // 사용자가 어느 주소로 왔는가?
-  const { pathname } = request.nextUrl;
-
-  // reset-password 경로 특별 처리
-  if (pathname === '/reset-password') {
-    const { supabase, response } = createClient(request);
-
-    // 세션 확인
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    // recovery 세션이 없으면 signin으로 리다이렉트
-    if (!session) {
-      return NextResponse.redirect(new URL('/signin', request.url));
-    }
-
-    // recovery 세션이 있으면 통과
-    return response;
-  }
-
-  // 루트 경로 접근 시 세션 체크
-  if (pathname === '/') {
-    const { supabase, response } = createClient(request);
-
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    // 세션이 없으면 signin으로 리다이렉트
-    if (!session) {
-      return NextResponse.redirect(new URL('/signin', request.url));
-    }
-
-    // 세션이 있으면 통과
-    return response;
-  }
-
-  // 다른 경로는 그대로 통과
-  return NextResponse.next();
+// API 함수로 할일 목록 전체 불러들이기 기능
+export async function fetchTodos() {
+  const response = await fetch('https://jsonplaceholder.typicode.com/todos');
+  if (!response.ok) throw new Error('목록을 가져오는데 실패함');
+  const todos: Todo[] = await response.json();
+  return todos;
 }
-
-export const config = {
-  matcher: ['/reset-password', '/'],
-};
 ```
 
-## 8. api 연결하기위해서 mutation 만들기
-
-- `/src/hooks/mutations/useRequestPasswordResetEmail.ts 파일` 생성
+- `src/hooks/todos 폴더` 생성
+- `src/hooks/todos/queries 폴더` 생성
+- `src/hooks/todos/queries/useFetchTodos.ts` 생성
 
 ```ts
-import { requestPasswordResetEmail } from '@/apis/auth';
-import { UseMutationCallback } from '@/types/types';
+import { fetchTodos } from '@/apis/todo';
+import { useQuery } from '@tanstack/react-query';
 
-import { useMutation } from '@tanstack/react-query';
-
-export function useRequestPasswordResetEmail(callbacks?: UseMutationCallback) {
-  return useMutation({
-    mutationFn: requestPasswordResetEmail,
-    onSuccess: () => {
-      if (callbacks?.onSuccess) callbacks.onSuccess();
-    },
-    onError: error => {
-      console.error(error);
-      if (callbacks?.onError) callbacks.onError(error);
-    },
+export function useFetchTodos() {
+  return useQuery({
+    queryKey: ['todos'],
+    queryFn: fetchTodos,
   });
 }
 ```
 
-## 9. mutation 활용하기
-
-- `/src/app/forget-password/page.tsx` 업데이트
+- `/src/app/todo-list/page.tsx` 활용하기
 
 ```tsx
 'use client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useRequestPasswordResetEmail } from '@/hooks/mutations/useRequestPasswordResetEmail';
-import { getErrorMessage } from '@/lib/error';
-import { useState } from 'react';
-import { toast } from 'sonner';
+import TodoEditor from '@/components/todo/TodoEditor';
+import TodoItem from '@/components/todo/TodoItem';
+import { useFetchTodos } from '@/hooks/todos/queries/useFetchTodos';
 
-export default function ForgetPassword() {
-  // 컴포넌트 state
-  const [email, setEmail] = useState('');
-  // mutation 실행하기
-  const { mutate, isPending } = useRequestPasswordResetEmail({
-    onSuccess: () => {
-      toast.info('인증 메일이 잘 발송되었습니다.', {
-        position: 'top-center',
-      });
-      setEmail('');
-    },
-    onError: error => {
-      const message = getErrorMessage(error);
-      toast.error(message, {
-        position: 'top-center',
-      });
-      setEmail('');
-    },
-  });
+export default function TodoListPage() {
+  const { data: todos, isLoading, error } = useFetchTodos();
 
-  // 이메일 전송 이벤트 핸들러
-  const handleEmailSendClick = () => {
-    if (email.trim() === '') return;
-    console.log(email);
-    // mutation 실행하기
-    mutate({ email });
-  };
+  if (isLoading) return <div>로딩중 ...</div>;
+  if (error) return <div>에러입니다: {error.message}</div>;
+  if (!todos) return <div>데이터가 없습니다.</div>;
 
   return (
-    <div className='flex flex-col gap-8'>
-      <div className='flex flex-col gap-1'>
-        <div className='text-xl font-bold'>비밀번호를 잊으셨나요?</div>
-        <div className='text-muted-foreground'>
-          이메일 비밀번호를 재설정 할 수 있는 인증 링크를 보내드립니다.
-        </div>
+    <div className='flex flex-col gap-5 p-5'>
+      <h1 className='text-2xl font-bold'>Todo List</h1>
+      <TodoEditor />
+      <div className='flex flex-col gap-2'>
+        {todos.map(item => (
+          <TodoItem key={item.id} id={item.id} content={item.title} />
+        ))}
       </div>
-      <Input
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        disabled={isPending}
-        className='py-6'
-        type='email'
-        placeholder='example@example.com'
-      />
-      <Button
-        onClick={handleEmailSendClick}
-        disabled={isPending}
-        className='w-full'
-      >
-        {isPending ? '인증 메일 요청 중...' : '인증 메일 요청하기'}
-      </Button>
     </div>
   );
 }
 ```
 
-## 10. 비밀번호 변경하기
+# useQuery 의 `데이터 캐싱 상태` 이해하기
 
-- /src/app/reset-password/page.tsx
+- 아래처럼 작성하시면 ['todos'] 이름으로 데이터를 보관합니다.
 
-### 10.1. UI 구성하기
-
-```tsx
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-
-function ResetPassword() {
-  return (
-    <div className='flex flex-col gap-8'>
-      <div className='flex flex-col gap-1'>
-        <div className='text-xl font-bold'>비밀번호 재설정하기</div>
-        <div className='text-muted-foreground'>
-          새로운 비밀번호를 입력하세요.
-        </div>
-      </div>
-      <Input className='py-6' type='password' placeholder='password' />
-      <Button className='w-full'>비밀번호 변경하기</Button>
-    </div>
-  );
-}
-
-export default ResetPassword;
+```ts
+useQuery({
+  queryKey: ['todos'],
+  queryFn: fetchTodos,
+});
 ```
 
-### 10.2. 컴포넌트 state 구성하기
+## 1. `캐시데이터`
 
-```tsx
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useState } from 'react';
+- 일정한 시간동안 중복된 데이터 요청이 있을 때 활용됨
+- 불필요한 데이터 요청이 들어오면 캐시데이터를 즉시 리턴함.
 
-function ResetPassword() {
-  const [password, setPassword] = useState('');
-  const handleResetPasswordClick = () => {
-    if (password.trim() === '') return;
-    console.log(password);
-  };
-  return (
-    <div className='flex flex-col gap-8'>
-      <div className='flex flex-col gap-1'>
-        <div className='text-xl font-bold'>비밀번호 재설정하기</div>
-        <div className='text-muted-foreground'>
-          새로운 비밀번호를 입력하세요.
-        </div>
-      </div>
-      <Input
-        value={password}
-        onChange={e => setPassword(e.target.value)}
-        className='py-6'
-        type='password'
-        placeholder='password'
-      />
-      <Button onClick={handleResetPasswordClick} className='w-full'>
-        비밀번호 변경하기
-      </Button>
-    </div>
-  );
-}
+## 2. 최신 데이터를 반영하여야 하는 경우
 
-export default ResetPassword;
-```
+- 특정시간 이후에 데이터가 자동으로 갱신됨
+- 원할 때 삭제하거나, 최신데이터를 반영하는 옵션을 제공함.
 
-### 10.3. api 만들기
+## 3. `캐시 데이터 상태 5가지 이해`가 필수
 
-```tsx
-// 비밀번호 재설정
-export async function updatePassword({ password }: { password: string }) {
-  const { data, error } = await supabase.auth.updateUser({
-    password,
-  });
+### 3.1. Fetching 상태
 
-  if (error) throw error;
-  return data;
-}
-```
+- 1번 단계
+- api 요청시 아직 `데이터가 불러들여지는 중`의 상태
+- 캐시에 보관 안됨.
+- 완료 되면 `Fresh 상태`로 변경됨.
 
-### 10.4. mutation 만들기
+### 3.2. Fersh 상태
 
-- `/src/hooks/muations/useUpdatePassword.ts 파일` 생성
+- 2번 단계
+- 데이터가 최신 상태, 즉 신선한 상태이다.
+- 지금 불러온 데이터이므로 신선한 Fresh 상태라고 한다.
+- 일정한 시간이 지나면 `Stale 상태`로 된다.
 
-```tsx
-import { updatePassword } from '@/apis/auth';
-import { UseMutationCallback } from '@/types/types';
-import { useMutation } from '@tanstack/react-query';
+### 3.3. Stale 상태
 
-export function useUpdatePassword(callbacks?: UseMutationCallback) {
-  return useMutation({
-    mutationFn: updatePassword,
-    onSuccess: () => {
-      if (callbacks?.onSuccess) callbacks.onSuccess();
-    },
-    onError: error => {
-      if (callbacks?.onError) callbacks.onError(error);
-    },
-  });
-}
-```
+- 3번 단계
+- 데이터를 불러온지 오랜 시간이 지나서 유통기한이 지나간 상태
+- 오래된 캐시 데이터이다. 갱신이 필요하다.
+- 유통기한을 지정하고 싶다.(`staleTime` 옵션)
+- staleTime 이 `글로벌로는 0` 으로 셋팅됨.
+- staleTime 이 `개별로`로 셋팅가능.
 
-### 10.5. mutation 활용하기
+### 3.4. inactive 상태
 
-```tsx
-'use client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useUpdatePassword } from '@/hooks/mutations/useUpdatePassword';
-import { getErrorMessage } from '@/lib/error';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { toast } from 'sonner';
+- 4번 단계
+- 리액트 컴포넌트가 화면에 `안보이고 있을때 상태`
+- `unMount 상태일때`
+- gcTime 이 `글로벌로는 30분 ` 으로 셋팅됨.
+- gcTime 이 `개별로` 셋팅가능.
+- gcTime 이 지나면 deleted 상태가 됨.
 
-function ResetPassword() {
-  const router = useRouter();
-  const [password, setPassword] = useState('');
-  const { mutate: updatePassword, isPending: isUpdatePasswordPending } =
-    useUpdatePassword({
-      onSuccess: () => {
-        toast.success('비밀번호가 성공적으로 변경되었습니다.', {
-          position: 'top-center',
-        });
-        router.push('/');
-      },
-      onError: error => {
-        const message = getErrorMessage(error);
-        toast.error(message, {
-          position: 'top-center',
-        });
-        setPassword('');
-      },
-    });
-  const handleResetPasswordClick = () => {
-    if (password.trim() === '') return;
-    console.log(password);
-    updatePassword({ password });
-  };
-  return (
-    <div className='flex flex-col gap-8'>
-      <div className='flex flex-col gap-1'>
-        <div className='text-xl font-bold'>비밀번호 재설정하기</div>
-        <div className='text-muted-foreground'>
-          새로운 비밀번호를 입력하세요.
-        </div>
-      </div>
-      <Input
-        value={password}
-        onChange={e => setPassword(e.target.value)}
-        disabled={isUpdatePasswordPending}
-        className='py-6'
-        type='password'
-        placeholder='password'
-      />
-      <Button
-        onClick={handleResetPasswordClick}
-        disabled={isUpdatePasswordPending}
-        className='w-full'
-      >
-        {isUpdatePasswordPending ? '비밀번호 변경 중...' : '비밀번호 변경하기'}
-      </Button>
-    </div>
-  );
-}
+### 3.5. deleted 상태
 
-export default ResetPassword;
-```
+- 5번 단계
+- 캐시 메모리 지워서 성능을 올려줌
+
+## 4. `언제 새로 데이터를 가지고 오는가?`
+
+- 리패칭은 `Stale 상태`에서 실행됨.
+- `Refetching` 이라고함.
+- `총 4가지 경우에 리패칭`이 일어남
+
+### 4.1. Mount
+
+- 캐시 데이터를 사용하는 컴포넌트가 화면에 보일때(Mount 될때)
+
+### 4.2. WindowFocus
+
+- 사용자가 다른 탭에 갔다가 다시 원래의 탭을 선택할 때
+
+### 4.3. Reconnect
+
+- 인터넷이 끊겼다가 다시 연결될때
+
+### 4.4. Interval
+
+- 우리가 설정한 일정한 시간 간격으로 리패칭함.
