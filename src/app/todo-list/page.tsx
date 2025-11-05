@@ -5,7 +5,7 @@ import { useFetchTodos } from '@/hooks/todos/queries/useFetchTodos';
 
 export default function TodoListPage() {
   const { data: todos, isLoading, error } = useFetchTodos();
-  
+
   if (isLoading) return <div>로딩중 ...</div>;
   if (error) return <div>에러입니다: {error.message}</div>;
   if (!todos) return <div>데이터가 없습니다.</div>;

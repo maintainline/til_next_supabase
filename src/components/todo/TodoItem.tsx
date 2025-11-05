@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { Button } from '../ui/button';
 
 export default function TodoItem({
@@ -12,7 +13,9 @@ export default function TodoItem({
 
   return (
     <div className='flex items-center justify-between border p-2'>
-      {content}
+      {/* 링크걸기 */}
+      <Link href={`/todo-detail/${id}`}>{content}</Link>
+
       <Button onClick={handleDeleteClick} variant={'destructive'}>
         삭제
       </Button>
