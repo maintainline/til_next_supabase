@@ -134,9 +134,6 @@ export default async function TodoDetailPage({ params }: TodoDetailPage) {
 ### 6.1. 리패칭 끄기 옵션
 
 ```ts
-import { fetchTodoById } from '@/apis/todo';
-import { useQuery } from '@tanstack/react-query';
-
 export function useTodoDataById(id: number) {
   return useQuery({
     queryKey: ['todos', id],
@@ -154,9 +151,6 @@ export function useTodoDataById(id: number) {
 ### 6.2. staleTime 옵션 이해하기
 
 ```ts
-import { fetchTodoById } from '@/apis/todo';
-import { useQuery } from '@tanstack/react-query';
-
 export function useTodoDataById(id: number) {
   return useQuery({
     queryKey: ['todos', id],
