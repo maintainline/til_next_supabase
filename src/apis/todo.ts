@@ -17,3 +17,31 @@ export async function fetchTodoById(id: number) {
   const data: Todo = await response.json();
   return data;
 }
+
+// 새로운 할일 등록 API
+export async function createTodo(title: string) {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_APP_URL_DEMO}/todos`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    }
+  );
+  if (!response.ok) throw new Error('Failed to create todo');
+  const data: Todo = await response.json();
+  return data;
+}
+
+// 할일업데이트 API
+export async function updateTodo(todo: Partial<Todo> & { id: number }) {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_APP_URL_DEMO}/todos/${todo.id}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(todo),
+    }
+  );
+  if (!response.ok) throw new Error('Failed to update todo');
+  const data: Todo = await response.json();
+  return data;
+}

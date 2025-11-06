@@ -16,7 +16,13 @@ export default function TodoListPage() {
       <TodoEditor />
       <div className='flex flex-col gap-2'>
         {todos.map(item => (
-          <TodoItem key={item.id} id={item.id} content={item.title} />
+          <TodoItem
+            key={item.id}
+            id={item.id}
+            title={item.title}
+            userId={item.userId}
+            completed={item.completed}
+          />
         ))}
       </div>
     </div>
