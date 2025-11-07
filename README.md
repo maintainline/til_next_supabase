@@ -615,3 +615,194 @@ export function useUpdateTodoMutation() {
 - 테스트해 보면 체크박스는 체크되고, 네트워크는 나중에 처리됨을 파악함.
 
 ## 7. 예외사항을 반드시 처리해야 합니다.
+
+- 안정적으로 낙관적 업데이트를 처리해주어야 한다.
+
+### 7.1. 비동기 요청이 실패 했을때 처리
+
+- onError 핸들러에서 원상복구 구현
+
+- 1 단계
+
+```ts
+  // 에러가 발생함
+  onError: error => {
+    console.log(error);
+  },
+```
+
+- 2 단계 . 매개변수를 추가함
+- valiable : onMutate 매개변수(원재료)와 동일한 값
+
+```ts
+  // 에러가 발생함
+  onError: (error, valiable) => {
+    console.log(error);
+  },
+```
+
+- 3 단계 . 매개변수를 추가함
+- context : onMutate 에서 리턴하는 반환값이 들어옴
+- context 를 이용해서 요청 실패시 원상복구 가능함.
+
+```ts
+  // 에러가 발생함
+  onError: (error, valiable, context) => {
+    console.log(error);
+  },
+```
+
+- 4 단계 . 일단 `원본 데이터를 보관`해 둔다. 이후 에러 시 복구함
+
+```ts
+onMutate: updatedTodo => {
+
+   // 원본데이트를 보관함.
+   const originTodos = queryClient.getQueryData();
+      // 낙관적 업데이트 진행함
+      나머지 코드...
+   },
+```
+
+- 5 단계 .
+
+```ts
+onMutate: updatedTodo => {
+
+   // 원본데이트를 보관함.
+   const originTodos = queryClient.getQueryData<Todo[]>();
+      // 낙관적 업데이트 진행함
+      나머지 코드...
+   },
+```
+
+- 6 단계 .
+
+```ts
+onMutate: updatedTodo => {
+
+   // 원본데이트를 보관함.
+   const originTodos = queryClient.getQueryData<Todo[]>(키명);
+      // 낙관적 업데이트 진행함
+      나머지 코드...
+   },
+```
+
+- 7 단계 .
+
+```ts
+onMutate: updatedTodo => {
+
+   // 원본데이트를 보관함.
+   const originTodos = queryClient.getQueryData<Todo[]>(QUERY_KEYS.todo.list );
+      // 낙관적 업데이트 진행함
+      나머지 코드...
+   },
+```
+
+- 8 단계 .
+
+```ts
+onMutate: updatedTodo => {
+
+   // 원본데이트를 보관함.
+   const originTodos = queryClient.getQueryData<Todo[]>( QUERY_KEYS.todo.list );
+      // 낙관적 업데이트 진행함
+      나머지 코드...
+
+      // 원상복구할 데이터를 리턴해 준다.
+      return { originTodos };
+   },
+```
+
+- 9 단계 . 복구 파일 활용하기 (`return { originTodos };`)
+- onError 핸들러에 context 를 활용함.
+
+```ts
+onError: (error, valiable, context) => {
+      console.log(error);
+
+      // 원상복구를 위해서 context 에 보관해둔 값으로 갱신한다.
+      if (context?.originTodos) {
+        queryClient.setQueryData<Todo[]>(
+          QUERY_KEYS.todo.list,
+          context.originTodos
+        );
+      }
+      return { error };
+    },
+```
+
+- 전체코드
+
+```ts
+import { updateTodo } from '@/apis/todo';
+import { Todo } from '@/apis/todo-type';
+import { QUERY_KEYS } from '@/lib/constants';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+export function useUpdateTodoMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateTodo,
+    onMutate: updatedTodo => {
+      // 원본데이트를 보관함.
+      const originTodos = queryClient.getQueryData<Todo[]>(
+        QUERY_KEYS.todo.list
+      );
+
+      // 낙관적 업데이트 진행함.
+      queryClient.setQueryData<Todo[]>(QUERY_KEYS.todo.list, prevTodos => {
+        if (!prevTodos) return [];
+        return prevTodos.map(todo =>
+          todo.id === updatedTodo.id ? { ...todo, ...updatedTodo } : todo
+        );
+      });
+
+      // 원상복구할 데이터를 리턴해 준다.
+      return { originTodos };
+    },
+    // 에러가 발생함
+    onError: (error, valiable, context) => {
+      console.log(error);
+      if (context?.originTodos) {
+        queryClient.setQueryData<Todo[]>(
+          QUERY_KEYS.todo.list,
+          context.originTodos
+        );
+      }
+      return { error };
+    },
+  });
+}
+```
+
+- 테스트 해보기 : 의도적으로 오류내기
+
+### 7.2. 타이밍에 의한 낙관적 업데이트 싱크오류
+
+- 수정하고 있는데 다른곳에서 목록을 조회하고 있다.
+- 수정이 진행중인데 ===> 목록조회 ===> 수정완료 ==> 목록조회 완료
+- 시점의 문제를 해결해야 한다.
+- `async await 을 활용하여 키 실행를 취소함`
+
+```ts
+  onMutate: async updatedTodo => {
+      // 요청취소 기능 구현
+      await queryClient.cancelQueries({queryKey:QUERY_KEYS.todo.list});
+
+  나머지 코드...
+    },
+```
+
+### 7.3. onMutate 데이터와 실제 서버에 수정데이터가 다를때
+
+- 프론트에서 성공으로 처리되었지만 실제 서버측에서 오류발생 존재함.
+- 요청이 종료되었을 때 캐시데이터를 무효화 시킴
+
+```ts
+  // 요청이 완료됨
+  onSettled: () => {
+     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.todo.list });
+  },
+```
