@@ -1,10 +1,18 @@
 'use client';
+import { useUpdateTodoMutation } from '@/hooks/todos/mutations/useUpdateTodoMutation';
+import { useTodoDataById } from '@/hooks/todos/queries/useTodoDataById';
 import Link from 'next/link';
 import { Button } from '../ui/button';
-import { Todo } from '@/apis/todo-type';
-import { useUpdateTodoMutation } from '@/hooks/todos/mutations/useUpdateTodoMutation';
 
-export default function TodoItem({ id, title, completed, userId }: Todo) {
+export default function TodoItem({ id }: { id: number }) {
+  // 개선된 코드 시작================================
+  // 캐시된 데이터를 활용한다. ('List' 매개변수 추가)
+  const { data: todo } = useTodoDataById(id, 'LIST');
+  if (!todo) throw new Error('현재 Todo가 없어요');
+  // 원하는 자료를 캐시로 부터 가져온다.
+  const { completed, title } = todo;
+  // 개선된 코드 종료================================
+
   // hook 활용하기
   const { mutate: updateTodo } = useUpdateTodoMutation();
 
@@ -13,7 +21,6 @@ export default function TodoItem({ id, title, completed, userId }: Todo) {
     updateTodo({ id, completed: !completed });
   };
 
-  
   const handleDeleteClick = () => {};
 
   return (
