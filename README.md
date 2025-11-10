@@ -1,266 +1,424 @@
-# 프로필 업데이트 하기
+# Post
 
-- 회원가입시 회원프로필 업데이트
-- 로그인 후 회원정보가 없으면 정보를 Insert 해준다.
+## 1. Post 추가하기 버튼
 
-## 1. API 만들기
-
-- `/src/apis/profile.ts 파일` 생성
-
-```ts
-import supabase from '@/lib/supabase/client';
-
-// 1. 회원정보 읽기
-// 회원의 ID 를 전달받아서 정보 데이터 반환함.
-// 비동기 작업이므로 asyn 적용
-export async function fetchProfile(userId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-```
-
-## 2. `쿼리 키 팩토리`를 생성
-
-- `쿼리 키`를 별도로 생성 관리함.
-- `/src/lib/constants.ts` 업데이트
-
-```ts
-// 쿼리키 팩토링 상수
-export const QUERY_KEYS = {
-  todo: {
-    all: ['todos'],
-    list: ['todos', 'list'],
-    detail: (id: string) => ['todos', 'deatail', id],
-  },
-  // 프로필 useQuery 키 생성 및 관리
-  profile: {
-    all: ['profile'],
-    list: ['profile', 'list'],
-    byId: (userId: string) => ['profile', 'byId', userId],
-  },
-};
-```
-
-## 3. hook 만들기
-
-- `/src/hooks/queries 폴더` 생성
-- `/src/hooks/queries/useProfileData.ts 파일` 생성
-
-```ts
-import { fetchProfile } from '@/apis/profile';
-import { QUERY_KEYS } from '@/lib/constants';
-import { useQuery } from '@tanstack/react-query';
-
-export default function useProfileData(userId?: string) {
-  return useQuery({
-    queryKey: QUERY_KEYS.profile.byId(userId!),
-    queryFn: () => fetchProfile(userId!),
-    enabled: !!userId,
-  });
-}
-```
-
-## 4. 활용하기
-
-- `/src/components/porviders/SessionProvider.tsx` 업데이트
-- 1 단계
+- `/src/components/post 폴더` 생성
+- `/src/components/post/CreatePostButton.tsx 파일` 생성
 
 ```tsx
-'use client';
-import supabase from '@/lib/supabase/client';
-import { useSession, useSessionLoaded, useSetSession } from '@/stores/session';
-import { useEffect } from 'react';
-import { GlobalLoading } from '../GlobalLoading';
-import useProfileData from '@/hooks/queries/useProfileData';
+import { PlusCircle } from 'lucide-react';
 
-interface SessionProviderProps {
-  children: React.ReactNode;
-}
-export default function SessionProvider({ children }: SessionProviderProps) {
-  // 1 단계. 현재 세션 Store 로 부터 사용자의 세션 데이터를 불러옴
-  const session = useSession();
-
-  const setSession = useSetSession();
-  const isSessionLoaded = useSessionLoaded();
-  // 2 단계
-  // session 데이터 안쪽의  user.id 를 인수로 전달함.
-  const { data: profile, isLoading: isProfileLoading } = useProfileData(
-    session?.user.id
+export function CreatePostButton() {
+  return (
+    <div className='bg-muted text-muted-foreground cursor-pointer rounded-xl px-6 py-4'>
+      <div className='flex items-center justify-between'>
+        <div>새글을 등록하세요.</div>
+        <PlusCircle className='h-5 w-5' />
+      </div>
+    </div>
   );
-
-  useEffect(() => {
-    // Supbase 의 인증의 상태가 변함을 체크함.
-    supabase.auth.onAuthStateChange((event, session) => {
-      // zustand 에 보관
-      setSession(session);
-    });
-  }, []);
-
-  // 아직 세션이 없다면
-  if (!isSessionLoaded) return <GlobalLoading />;
-
-  // 3단계
-  if (isProfileLoading) return <GlobalLoading />;
-
-  return <div>{children}</div>;
 }
 ```
 
-- 2 단계 : React Query 의 default 옵션 적용하기
-- 굳이 profiles 테이블에 있는지 4번 이나 질의하는 것은 필요없다.
-- `/src/components/porviders/QueryProvider.tsx` 업데이트
+## 2. 페이지 추가하기
+
+- `/src/app/(protected)/page.tsx` 추가
 
 ```tsx
-/*
-QueryClient 를 App 전체에 제공함
-- 모든 하위 컴포넌트에서 useQuery, useMutaion 등의 훅을 사용할 수있게함
- **/
-'use client';
+import { CreatePostButton } from '@/components/post/CreatePostButton';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools/production';
+export default function Home() {
+  return (
+    <div className='flex flex-col gap-10'>
+      <CreatePostButton />
+    </div>
+  );
+}
+```
+
+## 3. 모달 만들기
+
+- `/src/components/modal 폴더` 만들기
+- `/src/components/modal/PostEditorModal.tsx` 만들기
+
+```tsx
+import { ImageIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+
+export default function PostEditorModal() {
+  return (
+    <Dialog>
+      <DialogContent>
+        <DialogTitle>포스트 작성</DialogTitle>
+        <textarea />
+        <Button>
+          <ImageIcon /> 이미지 추가
+        </Button>
+        <Button>저장</Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+## 4. 모달창 출력후 스타일 하기
+
+- `/src/components/post/CreatePostButton.tsx`
+
+```tsx
+'use client';
+import { PlusCircle } from 'lucide-react';
+import PostEditorModal from '../modal/PostEditorModal';
 import { useState } from 'react';
 
-export default function QueryProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  // React 라면 아래 설정은 달라집니다.
-  // 현재 Next.js 에다가 셋팅을 진행함.
-  // 서버 사이드 렌더링을 위한 QueryClient 인스턴스 생성
-  // 각 요청마다 새로운 QueryClient 를 생성하여 상태 구분함.
-  const [client, setClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            retry: false,
-            refetchOnWindowFocus: false,
-          },
-        },
-      })
-  );
-
+export function CreatePostButton() {
+  const [modalOpen, setModalOpen] = useState(false);
   return (
-    <QueryClientProvider client={client}>
-      {children}
-      {/* npm run dev 상태에서만 개발자 도구 보기 */}
-      {process.env.NODE_ENV === 'development' && (
-        <ReactQueryDevtools
-          initialIsOpen={false}
-          buttonPosition='bottom-right'
-        />
-      )}
-    </QueryClientProvider>
+    <>
+      <div
+        onClick={() => setModalOpen(true)}
+        className='bg-muted text-muted-foreground cursor-pointer rounded-xl px-6 py-4'
+      >
+        <div className='flex items-center justify-between'>
+          <div>새글을 등록하세요.</div>
+          <PlusCircle className='h-5 w-5' />
+        </div>
+      </div>
+
+      <PostEditorModal isOpen={modalOpen} />
+    </>
   );
 }
 ```
 
-## 5. 오류체크하고 기본 profile 입력해주기
+- `/src/components/modal/PostEditorModal.tsx`
 
-- 자동으로 기본 프로필 생성함.
+```tsx
+import { ImageIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
-### 5.1. 중복되지 않는 닉네임 생성 기능 추가
+export default function PostEditorModal({ isOpen }: { isOpen: boolean }) {
+  return (
+    <Dialog open={isOpen}>
+      <DialogContent className='max-h-[90vh]'>
+        <DialogTitle>포스트 작성</DialogTitle>
+        <textarea
+          className='max-h-125 min-h-25 focus:outline-none'
+          placeholder='새로운 글을 등록해주세요.'
+        />
+        <Button variant='outline' className='cursor-pointer'>
+          <ImageIcon /> 이미지 추가
+        </Button>
+        <Button className='cursor-pointer'>저장</Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
 
-- `/src/lib/utils.ts` 추가
+- 다시 원복시킴
+
+```tsx
+import { PlusCircle } from 'lucide-react';
+
+export function CreatePostButton() {
+  return (
+    <div className='bg-muted text-muted-foreground cursor-pointer rounded-xl px-6 py-4'>
+      <div className='flex items-center justify-between'>
+        <div>새글을 등록하세요.</div>
+        <PlusCircle className='h-5 w-5' />
+      </div>
+    </div>
+  );
+}
+```
+
+## 5. zustand로 modal 의 상태를 전역 관리하기
+
+### 5.1 store 만들기
+
+- `src/stores/postEditorModalStore.ts 파일` 생성
 
 ```ts
-// 랜덤하면서 중복되지 않는 닉네임 생성
-export const getRandomNickName = () => {
-  const randomResult = Math.random().toString(36).substring(2, 8);
-  return `user_nickname_${randomResult}`;
+import { create } from 'zustand';
+import { combine, devtools } from 'zustand/middleware';
+
+const initialState = {
+  isOpen: false,
+};
+// 단계가 중요함.
+// 미들웨어와 겹침을 주의하자
+// Store 는 state 와 action 이 있다.
+const usePostEditorStore = create(
+  devtools(
+    combine(initialState, set => ({
+      actions: {
+        open: () => {
+          set({ isOpen: true });
+        },
+        close: () => {
+          set({ isOpen: false });
+        },
+      },
+    })),
+    { name: 'usePostEditorStore' }
+  )
+);
+
+// 오로지 store 의 actions 의 open만 가져감
+export const useOpenPostEditorModal = () => {
+  const open = usePostEditorStore(store => store.actions.open);
+  return open;
+};
+
+// 미리 store 전체 내보내기
+export const usePostEditorModal = () => {
+  const {
+    isOpen,
+    actions: { open, close },
+  } = usePostEditorStore();
+  return { isOpen, open, close };
 };
 ```
 
-### 5.2. API 생성하기
+### 5.2. PostEditorModal 컴포넌트 화면에 렌더링 하기
 
-- `/src/apis/profile.ts` 기능 추가
+- 화면에 출력을 시키려면 누군가의 `자식 컴포넌트 (children)`여야 한다.
+- `src/components/providers/ModalProvider.tsx` 파일 생성
+- 여기에서 새로운 `createPortal` 문법을 살펴봄
 
-```ts
-// 2. 사용자 정보 생성하기
-export async function createProfile(userId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .insert({ id: userId, nickname: getRandomNickName() })
-    .select()
-    .single();
+```tsx
+'use client';
+import { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import PostEditorModal from '../modal/PostEditorModal';
 
-  if (error) throw error;
-  return data;
+export default function ModalProvider({ children }: { children: ReactNode }) {
+  return (
+    <>
+      {createPortal(
+        <PostEditorModal />,
+        document.getElementById('modal-root')!
+      )}
+      {children}
+    </>
+  );
 }
 ```
 
-### 5.3. 프로필 조회 실패시 호출해 주기
+### 5.3. 새로운 div 태그 만들기
 
-- `/src/hooks/queries/useProfileData.ts` 업데이트
+- `src/app/layout.tsx` 업데이트
 
-```ts
-import { createProfile, fetchProfile } from '@/apis/profile';
-import { QUERY_KEYS } from '@/lib/constants';
-import { useQuery } from '@tanstack/react-query';
-import type { PostgrestError } from '@supabase/supabase-js';
+```tsx
+import type { Metadata } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
+import './globals.css';
+import QueryProvider from '@/components/providers/QueryProvider';
+import Link from 'next/link';
+import Image from 'next/image';
+import { Sun } from 'lucide-react';
+import ToastProvider from '@/components/providers/ToastProvider';
+import SessionProvider from '@/components/providers/SessionProvider';
+import ModalProvider from '@/components/providers/ModalProvider';
 
-export default function useProfileData(userId?: string) {
-  return useQuery({
-    queryKey: QUERY_KEYS.profile.byId(userId!),
-    queryFn: async () => {
-      try {
-        const profile = await fetchProfile(userId!);
-        return profile;
-      } catch (error) {
-        // 에러코드 파악으로 처리함
-        if ((error as PostgrestError).code === 'PGRST116') {
-          // 기본 사용자 생성
-          return await createProfile(userId!);
-        }
-        throw error;
-      }
-    },
-    enabled: !!userId,
-  });
+const geistSans = Geist({
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
+});
+
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+});
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+};
+
+// 이미지 가져오기
+const logo = '/assets/logo.png';
+const defaultAvatar = '/assets/icons/default-avatar.jpg';
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang='ko'>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        {/* Portal 용 DIV */}
+        <div id='modal-root' />
+
+        <div className='flex min-h-[100vh] flex-col'>
+          {/* 컴포넌트 배치 */}
+          <ToastProvider />
+
+          <QueryProvider>
+            <SessionProvider>
+              <ModalProvider>
+                <header className='h-15 border-b'>
+                  <div className='m-auto flex h-full w-full max-w-175 justify-between px-4'>
+                    <Link href={'/'} className='flex items-center gap-2'>
+                      <Image
+                        src={logo}
+                        alt='SNS 서비스 로고'
+                        width={40}
+                        height={40}
+                      />
+                      <div className='font-bold'>SNS 서비스</div>
+                    </Link>
+
+                    <div className='flex items-center gap-5'>
+                      <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
+                        <Sun />
+                      </div>
+                      <Image
+                        src={defaultAvatar}
+                        alt='기본 아바타'
+                        width={24}
+                        height={24}
+                        className='h-6'
+                      />
+                    </div>
+                  </div>
+                </header>
+                <main className='m-auto w-full max-w-175 flex-1 border-x px-4 py-6'>
+                  {children}
+                </main>
+                <footer className='text-muted-foreground border-t py-10 text-center'>
+                  @z.seon.dev
+                </footer>
+              </ModalProvider>
+            </SessionProvider>
+          </QueryProvider>
+        </div>
+      </body>
+    </html>
+  );
 }
 ```
 
-### 5.4. 다른 사용자가 만약 없는 사용자 프로필을 호출한다면
+## 6. zustand Modal 적용하기
 
-- 타인의 프로필은 생성하지 않도록 처리 필요.
+- `src/components/post/CratePostButton.tsx`
 
-```ts
-import { createProfile, fetchProfile } from '@/apis/profile';
-import { QUERY_KEYS } from '@/lib/constants';
-import { useQuery } from '@tanstack/react-query';
-import type { PostgrestError } from '@supabase/supabase-js';
-import { useSession } from '@/stores/session';
+```tsx
+import { useOpenPostEditorModal } from '@/stores/postEditorModalStore';
+import { PlusCircle } from 'lucide-react';
 
-export default function useProfileData(userId?: string) {
-  // 나의 정보 확인
-  const session = useSession();
-  // 나의 계정인지를 검사
-  const isMine = userId === session?.user.id;
-
-  return useQuery({
-    queryKey: QUERY_KEYS.profile.byId(userId!),
-    queryFn: async () => {
-      try {
-        const profile = await fetchProfile(userId!);
-        return profile;
-      } catch (error) {
-        // 에러코드 파악으로 처리함
-        if (isMine && (error as PostgrestError).code === 'PGRST116') {
-          // 기본 사용자 생성
-          return await createProfile(userId!);
-        }
-        throw error;
-      }
-    },
-    enabled: !!userId,
-  });
+export function CreatePostButton() {
+  const openPostEditorModal = useOpenPostEditorModal();
+  return (
+    <div
+      onClick={openPostEditorModal}
+      className='bg-muted text-muted-foreground cursor-pointer rounded-xl px-6 py-4'
+    >
+      <div className='flex items-center justify-between'>
+        <div>새글을 등록하세요.</div>
+        <PlusCircle className='h-5 w-5' />
+      </div>
+    </div>
+  );
 }
+```
+
+- `/src/components/modal/PostEditorModal.tsx` 업데이트
+
+- 업데이트
+
+```tsx
+import { ImageIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { usePostEditorModal } from '@/stores/postEditorModalStore';
+
+export default function PostEditorModal() {
+  const { isOpen, close } = usePostEditorModal();
+  const handleCloseModal = () => {
+    close();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleCloseModal}>
+      <DialogContent className='max-h-[90vh]'>
+        <DialogTitle>포스트 작성</DialogTitle>
+        <textarea
+          className='max-h-125 min-h-25 focus:outline-none'
+          placeholder='새로운 글을 등록해주세요.'
+        />
+        <Button variant='outline' className='cursor-pointer'>
+          <ImageIcon /> 이미지 추가
+        </Button>
+        <Button className='cursor-pointer'>저장</Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+## 7. 편의 기능 넣기
+
+### 7.1. 자동으로 내용 높이 창 변경하기
+
+```tsx
+'use client';
+import { ImageIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { usePostEditorModal } from '@/stores/postEditorModalStore';
+import { useEffect, useRef, useState } from 'react';
+
+export default function PostEditorModal() {
+  const { isOpen, close } = usePostEditorModal();
+  const [content, setContent] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [content]);
+
+  const handleCloseModal = () => {
+    close();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleCloseModal}>
+      <DialogContent className='max-h-[90vh]'>
+        <DialogTitle>포스트 작성</DialogTitle>
+        <textarea
+          ref={textareaRef}
+          value={content}
+          onChange={e => setContent(e.target.value)}
+          className='max-h-125 min-h-25 focus:outline-none'
+          placeholder='새로운 글을 등록해주세요.'
+        />
+        <Button variant='outline' className='cursor-pointer'>
+          <ImageIcon /> 이미지 추가
+        </Button>
+        <Button className='cursor-pointer'>저장</Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+### 7.2. 자동 포커스 및 내용 초기화 넣기
+
+```tsx
+// 자동 포커스 및 초기화
+useEffect(() => {
+  if (!isOpen) return;
+  textareaRef.current?.focus();
+  // 내용 비우기
+  setContent('');
+}, [isOpen]);
 ```
