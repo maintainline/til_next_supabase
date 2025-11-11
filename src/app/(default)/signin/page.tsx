@@ -1,9 +1,9 @@
 'use client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useSignInWithGoogle } from '@/hooks/mutations/useSignInWithGoogle';
-import { useSignInWithKakao } from '@/hooks/mutations/useSignInWithKakao';
-import { useSignInWithPassword } from '@/hooks/mutations/useSignInWithPassword';
+import { useSignInWithGoogle } from '@/hooks/auth/useSignInWithGoogle';
+import { useSignInWithKakao } from '@/hooks/auth/useSignInWithKakao';
+import { useSignInWithPassword } from '@/hooks/auth/useSignInWithPassword';
 import { getErrorMessage } from '@/lib/error';
 import Link from 'next/link';
 import { useState } from 'react';

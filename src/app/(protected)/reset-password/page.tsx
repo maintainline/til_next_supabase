@@ -1,7 +1,7 @@
 'use client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useUpdatePassword } from '@/hooks/mutations/useUpdatePassword';
+import { useUpdatePassword } from '@/hooks/auth/useUpdatePassword';
 import { getErrorMessage } from '@/lib/error';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
