@@ -91,7 +91,7 @@ export async function deletePost(id: number) {
 export async function fetchPosts() {
   const { data, error } = await supabase
     .from('posts')
-    .select('*')
+    .select('*, author: profiles!author_id(*)')
     .order('created_at', { ascending: false });
 
   if (error) throw error;

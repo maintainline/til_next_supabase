@@ -12,6 +12,9 @@ export type UpdateProfileEntity =
   Database['public']['Tables']['profiles']['Update'];
 export type ProfileTableEntity = Database['public']['Tables']['profiles'];
 
+// 포스트와 프로필 타입 조합
+export type Post = PostEntity & { author: ProfileEntity };
+
 export type UseMutationCallback = {
   onError?: (error: Error) => void;
   onSuccess?: () => void;
