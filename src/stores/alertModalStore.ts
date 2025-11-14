@@ -43,5 +43,6 @@ export const useOpenAlertModal = () => {
 export const useAlertModal = () => {
   const store = useAlertModalStore();
   // 아래는 우리가 원하는 타입을 추가해서 리턴하기 위한 처리
+  // & 는 intersection 으로 타입을 합친다는 의미
   return store as typeof store & State;
 };

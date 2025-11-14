@@ -1,4 +1,5 @@
 'use client';
+import type { Post } from '@/types/types';
 import { HeartIcon, MessageCircle } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,6 @@ import {
   CarouselItem,
 } from '@/components/ui/carousel';
 import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
-import { Post } from '@/types/types';
 import { formatTimeAgo } from '@/lib/time';
 
 export default function PostItem(post: Post) {

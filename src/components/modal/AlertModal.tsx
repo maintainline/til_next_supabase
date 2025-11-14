@@ -13,12 +13,10 @@ import { useAlertModal } from '@/stores/alertModalStore';
 export default function AleartModal() {
   const store = useAlertModal();
   if (!store.isOpen) return null;
-
   const handleCancle = () => {
     if (store.onNegative) store.onNegative();
     store.actions.close();
   };
-
   const handleOk = () => {
     if (store.onPositive) store.onPositive();
     store.actions.close();

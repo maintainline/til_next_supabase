@@ -2,10 +2,10 @@
 import { ImageIcon, XIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { usePostEdiotorModal } from '@/stores/postEditorModalStore';
 import { useEffect, useRef, useState } from 'react';
+import { useCreatePost } from '@/hooks/mutations/post/useCreatePost';
 import { toast } from 'sonner';
-import { useCreatePost } from '@/hooks/post/useCreatePost';
-import { usePostEditorModal } from '@/stores/postEditorModalStore';
 import { Carousel, CarouselContent, CarouselItem } from '../ui/carousel';
 import Image from 'next/image';
 import { useSession } from '@/stores/session';
@@ -23,7 +23,7 @@ export default function PostEditorModal() {
   // 경고창
   const openAlertModal = useOpenAlertModal();
 
-  const { isOpen, close } = usePostEditorModal();
+  const { isOpen, close } = usePostEdiotorModal();
   // 글등록 mutation 을 사용함.
   const { mutate: createPost, isPending: isCreatePostPending } = useCreatePost({
     onSuccess: () => {
@@ -40,7 +40,7 @@ export default function PostEditorModal() {
   const [content, setContent] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // 이미지 input 태그 참조
+  // 이미지 Input 태그 참조
   const fileInputRef = useRef<HTMLInputElement>(null);
   // 이미지 미리보기 내용들
   const [images, setImages] = useState<ImageFile[]>([]);
@@ -56,7 +56,7 @@ export default function PostEditorModal() {
   useEffect(() => {
     if (!isOpen) return;
 
-    //웹 브라우저의 캐시에 저장된 이미지 리셋
+    // 웹브라우저의 캐시에 저장된 이미지 리셋
     images.forEach(img => {
       // 메모리 상에서 제거
       URL.revokeObjectURL(img.previewUrl);
@@ -69,7 +69,7 @@ export default function PostEditorModal() {
 
   const handleCloseModal = () => {
     if (content !== '' || images.length !== 0) {
-      // 안내창을 띄워서 확인 후 닫기 실행 처리
+      // 안내창을 띄워서 확인후 닫기 실행처리
       openAlertModal({
         title: '포스트 작성이 완료되지 않았습니다.',
         description: '화면에서 나가면 작성중이던 내용이 사라집니다.',
@@ -92,12 +92,12 @@ export default function PostEditorModal() {
     createPost({
       content: content,
       userId: session!.user.id,
-      // 파일만 추출해주기
+      // 파일만 추출해 주기
       images: images.map(item => item.file),
     });
   };
 
-  // 이미지들이 선택되었을때 실행할 핸들러
+  // 이미지들이 선택되었을 때 실행할 핸들러
   const handleSelectImages = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       // 객체로 부터 배열 만드는 Array.from
@@ -134,7 +134,8 @@ export default function PostEditorModal() {
           className='max-h-125 min-h-25 focus:outline-none'
           placeholder='새로운 글을 등록해주세요.'
         />
-        {/*  이미지 선택 input 태그 숨김 */}
+
+        {/* 이미지 선택 Input 태그 숨김 */}
         <input
           onChange={handleSelectImages}
           ref={fileInputRef}
@@ -143,7 +144,8 @@ export default function PostEditorModal() {
           multiple
           className='hidden'
         />
-        {/*  이미지 미리보기 슬라이드 */}
+
+        {/* 이미지 미리보기 슬라이드 */}
         {images.length > 0 && (
           <Carousel>
             <CarouselContent>
@@ -151,10 +153,10 @@ export default function PostEditorModal() {
                 <CarouselItem key={index} className='basis-2/5'>
                   <div className='relative w-full h-48'>
                     <Image
+                      src={img.previewUrl}
                       alt='이미지 미리보기'
                       fill
                       unoptimized
-                      src={img.previewUrl}
                       className='rounded-sm object-cover'
                     />
                     {/* 삭제 아이콘 및 기능 추가 */}
@@ -178,6 +180,7 @@ export default function PostEditorModal() {
         >
           <ImageIcon /> 이미지 추가
         </Button>
+
         <Button
           disabled={isCreatePostPending}
           onClick={handleCreatePost}

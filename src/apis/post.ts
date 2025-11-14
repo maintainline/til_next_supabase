@@ -1,6 +1,6 @@
 import supabase from '@/lib/supabase/client';
+import { UpdatePostEntity } from '@/types/types';
 import { uploadImage } from './image';
-import { PostEntity, UpdatePostEntity } from '@/types/types';
 
 // 1. 글 등록
 export async function createPost(content: string) {
@@ -88,11 +88,12 @@ export async function deletePost(id: number) {
 }
 
 // 5. 포스트 목록 조회
-export async function fetchPosts() {
+export async function fetchPosts({ from, to }: { from: number; to: number }) {
   const { data, error } = await supabase
     .from('posts')
     .select('*, author: profiles!author_id(*)')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(from, to);
 
   if (error) throw error;
   return data;

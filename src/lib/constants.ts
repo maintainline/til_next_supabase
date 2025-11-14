@@ -14,5 +14,5 @@ export const QUERY_KEYS = {
   },
 };
 
-// 버킷이름 : supabase Storage 저장소
+// 버킷 이름 : Supabase Storage
 export const BUCKET_NAME = 'uploads';
