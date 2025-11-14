@@ -99,3 +99,14 @@ export async function fetchPosts({ from, to }: { from: number; to: number }) {
   if (error) throw error;
   return data;
 }
+
+// 6. 포스트 하나 조회
+export async function fetchPostById(postId: number) {
+  const { data, error } = await supabase
+    .from('posts')
+    .select('*, author: profiles!author_id(*)')
+    .eq('id', postId)
+    .single();
+  if (error) throw error;
+  return data;
+}

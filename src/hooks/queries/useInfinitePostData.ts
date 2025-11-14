@@ -1,29 +1,35 @@
-import { fetchPosts } from '@/apis/post';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '@/lib/constants';
-import { useInfiniteQuery } from '@tanstack/react-query';
-
-// 하나의 페이지마다 불러들일 개수
+import { fetchPosts } from '@/apis/post';
 const PAGE_SIZE = 5;
 
 export function useInfinitePostData() {
+  // 1. 쿼리클라이언트 불러오기
+  const queryClient = useQueryClient();
+
   return useInfiniteQuery({
     queryKey: QUERY_KEYS.posts.list,
-    queryFn: async ({ pageParam = 0 }) => {
+
+    queryFn: async ({ pageParam }) => {
       const from = pageParam * PAGE_SIZE;
-      const to = from + PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
       const posts = await fetchPosts({ from, to });
-      return posts;
+
+      //2. 캐시 저장
+      posts.forEach(post => {
+        queryClient.setQueryData(QUERY_KEYS.posts.byId(post.id), post);
+      });
+
+      //3. 리턴
+      //return posts;
+      return posts.map(post => post.id);
     },
     initialPageParam: 0,
-    // 다음 페이지 번호 계산용 함수
     getNextPageParam: (lastPage, allPages) => {
-      // 마지막 페이지라면
       if (lastPage.length < PAGE_SIZE) return undefined;
-      // 첫 페이지 즉 initialPageParam 가 0으로 출발
-      // 다음 페이지는 allPages.length 가 됩니다.
-      // 첫 페이지 0 출력후 1로 증가
-      // 두번째 페이지 1 출력후 2로 증가
       return allPages.length;
     },
+    //옵션들 : stale 상태로 안감
+    staleTime: Infinity,
   });
 }

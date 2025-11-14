@@ -6,7 +6,7 @@ import PostItem from './PostItem';
 import { useInfinitePostData } from '@/hooks/queries/useInfinitePostData';
 import { useEffect } from 'react';
 import { useInView } from 'react-intersection-observer';
-import FallBack from '../Fallback';
+import FallBack from '../FallBack';
 
 export default function PostFeed() {
   // 무한 루프 API 호출(fetchNextPage 추가)
@@ -26,10 +26,8 @@ export default function PostFeed() {
   if (isPending) return <Loader />;
   return (
     <div className='flex flex-col gap-10'>
-      {/* useInfinite 는 리턴으로 페이지별로 배열로 묶어서 전달함 */}
-      {/* map 을 2번 반복함. */}
-      {data.pages?.map(page =>
-        page.map(post => <PostItem key={post.id} {...post} />)
+      {data?.pages.map(page =>
+        page.map(postId => <PostItem key={postId} postId={postId} />)
       )}
       {isFetchingNextPage && <Loader />}
       {/* 웹브라우저 하단 감지용 DOM 요소를 추가 */}

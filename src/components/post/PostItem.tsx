@@ -12,11 +12,23 @@ import DeletePostButton from './DeletePostButton';
 import { EditPostItemButton } from './EditPostItemButton';
 import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
 import { useSession } from '@/stores/session';
+import { usePostByIdData } from '@/hooks/queries/usePostByIdData';
+import Loader from '../Loader';
+import FallBack from '../FallBack';
 
-export default function PostItem(post: Post) {
+export default function PostItem({ postId }: { postId: number }) {
   // 내가 만든 post 인지 확인
   const session = useSession();
   const userId = session?.user.id;
+  // 실제 쿼리로 id 를 전달해서 post 를 가져오자.
+  const {
+    data: post,
+    isPending,
+    error,
+  } = usePostByIdData({ postId, type: 'FEED' });
+  if (isPending) return <Loader />;
+  if (error) return <FallBack />;
+
   const isMine = userId === post.author.id;
 
   return (
