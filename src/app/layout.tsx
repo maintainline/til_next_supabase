@@ -38,8 +38,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* Portal 용 DIV */}
-        <div id='modal-root' />
+        {/* portal 용 div */}
+        <div id='modal-root'></div>
 
         <div className='flex min-h-[100vh] flex-col'>
           {/* 컴포넌트 배치 */}

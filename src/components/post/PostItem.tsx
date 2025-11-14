@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/carousel';
 import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
 import { formatTimeAgo } from '@/lib/time';
+import { EditPostItemButton } from './EditPostItemButton';
 
 export default function PostItem(post: Post) {
   return (
@@ -19,7 +20,7 @@ export default function PostItem(post: Post) {
         {/* 1-1. 유저 정보 */}
         <div className='flex items-start gap-4'>
           <Image
-            src={post.author.avatar_url || defaultAvatar}
+            src={post.author.abatar_url || defaultAvatar}
             alt={`${post.author.nickname}의 프로필 이미지`}
             className='h-10 w-10 rounded-full object-cover'
             width={40}
@@ -38,9 +39,7 @@ export default function PostItem(post: Post) {
 
         {/* 1-2. 수정/삭제 버튼 */}
         <div className='text-muted-foreground flex text-sm'>
-          <Button className='cursor-pointer' variant={'ghost'}>
-            수정
-          </Button>
+          <EditPostItemButton {...post} />
           <Button className='cursor-pointer' variant={'ghost'}>
             삭제
           </Button>

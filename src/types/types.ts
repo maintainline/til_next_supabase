@@ -4,7 +4,6 @@ export type PostEntity = Database['public']['Tables']['posts']['Row'];
 export type InsertPostEntity = Database['public']['Tables']['posts']['Insert'];
 export type UpdatePostEntity = Database['public']['Tables']['posts']['Update'];
 export type PostTableEntity = Database['public']['Tables']['posts'];
-
 // 프로필 관련
 export type ProfileEntity = Database['public']['Tables']['profiles']['Row'];
 export type InsertProfileEntity =

@@ -72,6 +72,7 @@ export async function updatePost(post: UpdatePostEntity & { id: number }) {
   if (error) throw error;
   return data;
 }
+
 // 4. 업로드 오류시 처리 함.
 export async function deletePost(id: number) {
   const { data, error } = await supabase

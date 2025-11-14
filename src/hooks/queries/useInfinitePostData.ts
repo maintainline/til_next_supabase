@@ -15,8 +15,14 @@ export function useInfinitePostData() {
       return posts;
     },
     initialPageParam: 0,
+    // 다음 페이지 번호 계산용 함수
     getNextPageParam: (lastPage, allPages) => {
+      // 마지막 페이지라면
       if (lastPage.length < PAGE_SIZE) return undefined;
+      // 첫 페이지 즉 initialPageParam 가 0으로 출발
+      // 다음 페이지는 allPages.length 가 됩니다.
+      // 첫 페이지 0 출력후 1로 증가
+      // 두번째 페이지 1 출력후 2로 증가
       return allPages.length;
     },
   });

@@ -1,5 +1,4 @@
 'use client';
-import FallBack from '../FallBack';
 import Loader from '../Loader';
 import PostItem from './PostItem';
 
@@ -7,17 +6,19 @@ import PostItem from './PostItem';
 import { useInfinitePostData } from '@/hooks/queries/useInfinitePostData';
 import { useEffect } from 'react';
 import { useInView } from 'react-intersection-observer';
+import FallBack from '../Fallback';
 
 export default function PostFeed() {
-  // 무한루프 API 호출 (fetchNextPage 추가)
+  // 무한 루프 API 호출(fetchNextPage 추가)
   const { data, error, isPending, fetchNextPage, isFetchingNextPage } =
     useInfinitePostData();
+
   // intersectionObserver 레퍼런스
   const { ref, inView } = useInView();
   // 데이터 추가 관리
   useEffect(() => {
     console.log('inView', inView);
-    // 데이터를 추가함(fetchNextPage 호출)
+    // 데이터를 추가함. (fetchNextPage 호출)
     fetchNextPage();
   }, [inView]);
 
@@ -25,7 +26,7 @@ export default function PostFeed() {
   if (isPending) return <Loader />;
   return (
     <div className='flex flex-col gap-10'>
-      {/* useinfinite 는 리턴으로 페이지별로 배열로 묶어서 전달함*/}
+      {/* useInfinite 는 리턴으로 페이지별로 배열로 묶어서 전달함 */}
       {/* map 을 2번 반복함. */}
       {data.pages?.map(page =>
         page.map(post => <PostItem key={post.id} {...post} />)
