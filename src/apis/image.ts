@@ -20,3 +20,18 @@ export async function uploadImage({ filePath, file }: ImageType) {
   } = supabase.storage.from(BUCKET_NAME).getPublicUrl(data.path);
   return publicUrl;
 }
+
+// 특정 경로 밑에 있는 모든 이미지를 지우는 기능
+export async function deleteImagesInPath(path: string) {
+  const { data: files, error: fetchFilesError } = await supabase.storage
+    .from(BUCKET_NAME)
+    .list(path);
+
+  if (fetchFilesError) throw fetchFilesError;
+
+  const { error: removeError } = await supabase.storage
+    .from(BUCKET_NAME)
+    .remove(files.map(file => `${path}/${file.name}`));
+
+  if (removeError) throw removeError;
+}
