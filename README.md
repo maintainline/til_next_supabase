@@ -227,3 +227,23 @@ export function useDeletePost(callback?: UseMutationCallback) {
   });
 }
 ```
+
+## 5. 내 포스트만 지우기 버튼 출력
+
+```tsx
+// 내가 만든 post 인지 확인
+const session = useSession();
+const userId = session?.user.id;
+const isMine = userId === post.author.id;
+```
+
+```tsx
+<div className='text-muted-foreground flex text-sm'>
+  {isMine && (
+    <>
+      <EditPostItemButton {...post} />
+      <DeletePostButton id={post.id} />
+    </>
+  )}
+</div>
+```
