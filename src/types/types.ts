@@ -13,7 +13,13 @@ export type UpdateProfileEntity =
 export type ProfileTableEntity = Database['public']['Tables']['profiles'];
 
 // 포스트와 프로필 타입 조합
-export type Post = PostEntity & { author: ProfileEntity };
+export type Post = PostEntity & { author: ProfileEntity; isLiked: boolean };
+
+// 좋아요 기능
+export type LikeEntity = Database['public']['Tables']['likes']['Row'];
+export type InsertLikeEntity = Database['public']['Tables']['likes']['Insert'];
+export type UpdateLikeEntity = Database['public']['Tables']['likes']['Update'];
+export type LikeTableEntity = Database['public']['Tables']['likes'];
 
 export type UseMutationCallback = {
   onError?: (error: Error) => void;

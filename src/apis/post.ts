@@ -88,25 +88,63 @@ export async function deletePost(id: number) {
   return data;
 }
 
-// 5. 포스트 목록 조회
-export async function fetchPosts({ from, to }: { from: number; to: number }) {
+// 5. 포스트 목록 조회 : like 관련내용도 가져옴
+export async function fetchPosts({
+  from,
+  to,
+  userId,
+}: {
+  from: number;
+  to: number;
+  userId: string;
+}) {
   const { data, error } = await supabase
     .from('posts')
-    .select('*, author: profiles!author_id(*)')
+    .select('*, author: profiles!author_id(*), myLiked: likes!post_id(*)')
+    .eq('myLiked.user_id', userId)
     .order('created_at', { ascending: false })
     .range(from, to);
 
   if (error) throw error;
-  return data;
+  return data.map(post => ({
+    ...post,
+    isLiked: post.myLiked && post.myLiked.length > 0,
+  }));
 }
 
 // 6. 포스트 하나 조회
-export async function fetchPostById(postId: number) {
+export async function fetchPostById({
+  postId,
+  userId,
+}: {
+  postId: number;
+  userId: string;
+}) {
   const { data, error } = await supabase
     .from('posts')
-    .select('*, author: profiles!author_id(*)')
+    .select('*, author: profiles!author_id(*), myLiked: likes!post_id(*)')
+    .eq('myLiked.user_id', userId)
     .eq('id', postId)
     .single();
+  if (error) throw error;
+  return {
+    ...data,
+    isLiked: data.myLiked && data.myLiked.length > 0,
+  };
+}
+
+// 7. 좋아요 토글
+export async function togglePostLike({
+  postId,
+  userId,
+}: {
+  postId: number;
+  userId: string;
+}) {
+  const { data, error } = await supabase.rpc('toggle_post_like', {
+    p_post_id: postId,
+    p_user_id: userId,
+  });
   if (error) throw error;
   return data;
 }

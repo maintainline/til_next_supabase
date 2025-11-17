@@ -15,6 +15,7 @@ import { useSession } from '@/stores/session';
 import { usePostByIdData } from '@/hooks/queries/usePostByIdData';
 import Loader from '../Loader';
 import FallBack from '../FallBack';
+import LikeButton from './LikeButtion';
 
 export default function PostItem({ postId }: { postId: number }) {
   // 내가 만든 post 인지 확인
@@ -38,7 +39,7 @@ export default function PostItem({ postId }: { postId: number }) {
         {/* 1-1. 유저 정보 */}
         <div className='flex items-start gap-4'>
           <Image
-            src={post.author.abatar_url || defaultAvatar}
+            src={post.author.avatar_url || defaultAvatar}
             alt={`${post.author.nickname}의 프로필 이미지`}
             className='h-10 w-10 rounded-full object-cover'
             width={40}
@@ -93,10 +94,11 @@ export default function PostItem({ postId }: { postId: number }) {
       {/* 3. 좋아요, 댓글 버튼 */}
       <div className='flex gap-2'>
         {/* 3-1. 좋아요 버튼 */}
-        <div className='hover:bg-muted flex cursor-pointer items-center gap-2 rounded-xl border-1 p-2 px-4 text-sm'>
-          <HeartIcon className='h-4 w-4' />
-          <span>0</span>
-        </div>
+        <LikeButton
+          id={post.id}
+          likeCount={post.like_count}
+          isLiked={post.isLiked}
+        />
 
         {/* 3-2. 댓글 버튼 */}
         <div className='hover:bg-muted flex cursor-pointer items-center gap-2 rounded-xl border-1 p-2 px-4 text-sm'>
