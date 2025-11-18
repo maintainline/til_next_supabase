@@ -16,6 +16,7 @@ import { usePostByIdData } from '@/hooks/queries/usePostByIdData';
 import Loader from '../Loader';
 import FallBack from '../FallBack';
 import LikeButton from './LikeButtion';
+import Link from 'next/link';
 
 export default function PostItem({ postId }: { postId: number }) {
   // 내가 만든 post 인지 확인
@@ -34,17 +35,19 @@ export default function PostItem({ postId }: { postId: number }) {
 
   return (
     <div className='flex flex-col gap-4 border-b pb-8'>
-      {/* 1. 유저 정보, 수정/삭제 버튼 */}
       <div className='flex justify-between'>
-        {/* 1-1. 유저 정보 */}
         <div className='flex items-start gap-4'>
-          <Image
-            src={post.author.avatar_url || defaultAvatar}
-            alt={`${post.author.nickname}의 프로필 이미지`}
-            className='h-10 w-10 rounded-full object-cover'
-            width={40}
-            height={40}
-          />
+          {/* 사용자 페이지 이동하기 */}
+          <Link href={`/profile/${post.author.id}`}>
+            <Image
+              src={post.author.avatar_url || defaultAvatar}
+              alt={`${post.author.nickname}의 프로필 이미지`}
+              className='h-10 w-10 rounded-full object-cover'
+              width={40}
+              height={40}
+            />
+          </Link>
+
           <div>
             <div className='font-bold hover:underline'>
               {post.author.nickname}

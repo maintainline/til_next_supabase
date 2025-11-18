@@ -8,10 +8,10 @@ import { useEffect } from 'react';
 import { useInView } from 'react-intersection-observer';
 import FallBack from '../FallBack';
 
-export default function PostFeed() {
+export default function PostFeed({ authorId }: { authorId?: string }) {
   // 무한 루프 API 호출(fetchNextPage 추가)
   const { data, error, isPending, fetchNextPage, isFetchingNextPage } =
-    useInfinitePostData();
+    useInfinitePostData(authorId);
 
   // intersectionObserver 레퍼런스
   const { ref, inView } = useInView();

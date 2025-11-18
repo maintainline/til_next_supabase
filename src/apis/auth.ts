@@ -62,3 +62,13 @@ export async function updatePassword({ password }: { password: string }) {
   if (error) throw error;
   return data;
 }
+
+// 로그아웃
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    await supabase.auth.signOut({
+      scope: 'local',
+    });
+  }
+}

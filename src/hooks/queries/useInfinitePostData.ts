@@ -4,30 +4,38 @@ import { fetchPosts } from '@/apis/post';
 import { useSession } from '@/stores/session';
 const PAGE_SIZE = 5;
 
-export function useInfinitePostData() {
-  // 1. 쿼리클라이언트 불러오기
+//  authorId?: string 포스트의 작성자 아이디 매개변수 전달
+export function useInfinitePostData(authorId?: string) {
   const queryClient = useQueryClient();
 
   //  like 추가 적용 : 사용자 정보
   const session = useSession();
 
   return useInfiniteQuery({
-    queryKey: QUERY_KEYS.posts.list,
+    // 보관하고 있는 캐시가 같이 업데이트
+    // 구분해 주자.
+    // queryKey: QUERY_KEYS.posts.list,
+
+    queryKey: !authorId
+      ? QUERY_KEYS.posts.list
+      : QUERY_KEYS.posts.userList(authorId),
 
     queryFn: async ({ pageParam }) => {
       const from = pageParam * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
-      //  like 추가 적용 : 사용자 정보
-      const posts = await fetchPosts({ from, to, userId: session!.user.id });
+      // authorId 포스트 작성자의 아이디도 전달
+      const posts = await fetchPosts({
+        from,
+        to,
+        userId: session!.user.id,
+        authorId,
+      });
 
-      //2. 캐시 저장
       posts.forEach(post => {
         queryClient.setQueryData(QUERY_KEYS.posts.byId(post.id), post);
       });
 
-      //3. 리턴
-      //return posts;
       return posts.map(post => post.id);
     },
     initialPageParam: 0,
@@ -35,7 +43,6 @@ export function useInfinitePostData() {
       if (lastPage.length < PAGE_SIZE) return undefined;
       return allPages.length;
     },
-    //옵션들 : stale 상태로 안감
     staleTime: Infinity,
   });
 }

@@ -5,6 +5,26 @@ export async function middleware(request: NextRequest) {
   // 사용자가 어느 주소로 왔는가?
   const { pathname } = request.nextUrl;
 
+  // profile 경로에서 유효하지 않은 id 처리
+  // /profile/ 또는 /profile/undefined 같은 경우 처리
+  if (pathname === '/profile' || pathname === '/profile/') {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  const profileMatch = pathname.match(/^\/profile\/(.+)$/);
+  if (profileMatch) {
+    const profileId = profileMatch[1];
+    // id가 없거나 빈 문자열이거나 'undefined' 문자열인 경우
+    if (
+      !profileId ||
+      profileId.trim() === '' ||
+      profileId === 'undefined' ||
+      profileId === 'null'
+    ) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+  }
+
   // reset-password 경로 특별 처리
   if (pathname === '/reset-password') {
     const { supabase, response } = createClient(request);
@@ -45,5 +65,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/reset-password', '/'],
+  matcher: ['/reset-password', '/', '/profile/:path*'],
 };

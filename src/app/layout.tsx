@@ -8,6 +8,7 @@ import { Sun } from 'lucide-react';
 import ToastProvider from '@/components/providers/ToastProvider';
 import SessionProvider from '@/components/providers/SessionProvider';
 import ModalProvider from '@/components/providers/ModalProvider';
+import ProfileButton from '@/components/header/ProfileButton';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -64,13 +65,7 @@ export default function RootLayout({
                       <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
                         <Sun />
                       </div>
-                      <Image
-                        src={defaultAvatar}
-                        alt='기본 아바타'
-                        width={24}
-                        height={24}
-                        className='h-6'
-                      />
+                      <ProfileButton />
                     </div>
                   </div>
                 </header>

@@ -5,11 +5,22 @@ import { useSignInWithGoogle } from '@/hooks/auth/useSignInWithGoogle';
 import { useSignInWithKakao } from '@/hooks/auth/useSignInWithKakao';
 import { useSignInWithPassword } from '@/hooks/auth/useSignInWithPassword';
 import { getErrorMessage } from '@/lib/error';
+import { useSession } from '@/stores/session';
 import Link from 'next/link';
-import { useState } from 'react';
+import { redirect } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 function SignIn() {
+  // 로그인 이후 이동
+  // 이미 로그인된 사용자는 홈으로 리다이렉트
+  const session = useSession();
+  useEffect(() => {
+    if (session) {
+      redirect('/');
+    }
+  }, [session]);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 

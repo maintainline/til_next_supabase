@@ -4,35 +4,30 @@ import { useSession, useSessionLoaded, useSetSession } from '@/stores/session';
 import { useEffect } from 'react';
 import { GlobalLoading } from '../GlobalLoading';
 import useProfileData from '@/hooks/queries/useProfileData';
+import { redirect } from 'next/navigation';
 
 interface SessionProviderProps {
   children: React.ReactNode;
 }
 export default function SessionProvider({ children }: SessionProviderProps) {
-  // 1단계. 현재 세션 Store로 부터 사용자의 세션 데이터를 불러옴
   const session = useSession();
-
   const setSession = useSetSession();
   const isSessionLoaded = useSessionLoaded();
-
-  // 2단계.
-  // session 데이터 안쪽의 user.id 를 인수로 전달함.
   const { data: profile, isLoading: isProfileLoading } = useProfileData(
     session?.user.id
   );
-
   useEffect(() => {
-    // Supbase 의 인증의 상태가 변함을 체크함.
+    // 사용자가 로그인, 로그아웃을 하면 자동실행 이벤트 핸들러
     supabase.auth.onAuthStateChange((event, session) => {
-      // zustand 에 보관
       setSession(session);
+      //로그아웃 진행시
+      if (event === 'SIGNED_OUT') {
+        redirect('/signin');
+      }
     });
-  }, []);
+  }, [session]);
 
-  // 아직 세션이 없다면
   if (!isSessionLoaded) return <GlobalLoading />;
-
-  // 3단계
   if (isProfileLoading) return <GlobalLoading />;
 
   return <div>{children}</div>;

@@ -1,335 +1,319 @@
-# like 기능 구현
+# profile 기능 구현
 
-## 1. like 기능에 대한 고민
+## 1. 로그인 이후 이동하기
 
-- 현재 `like`는 `like 횟수` 만큼 `select` 하고 + 1 또는 -1 을 해준다.
-- 여러명이 동시에 `like` 를 호출했을 때 `update` 에 숫자 오류 발생 가능
-- 아주 흔하게 발생하는 이슈.
-- 통칭 `동시성 이슈` 라고 칭함.
-- `업데이트 이전까지는 다른 사용자가 접근 처리를 제어`해야 함.
-
-## 2. 해결책
-
-- `select 요청`이 보내질때 `update 가 진행중인지를 조회 후 행을 잠금`
-- 리액트에서는 행을 잠글 수 없다.
-- 데이터베이스의 잠금 기능 및 업데이트를 제어하려면 DB 명령어로 실행 필요
-- Supabase 에서는 RPC 를 제공함.
-- `RPC` : Remote Procedure Call (원격으로 데이터베이스의 명령 실행)
-- React : React Query 에서 `낙관적 업데이트` 로 진행
-
-## 3. like UI 구성
-
-- `src/components/post/PostItem.tsx`
-- 아래 버튼을 별도의 컴포넌트로 추출
+- `/src/app/(default)/signin/page.tsx`
 
 ```tsx
-{
-  /* 3-1. 좋아요 버튼 */
-}
-<div className='hover:bg-muted flex cursor-pointer items-center gap-2 rounded-xl border-1 p-2 px-4 text-sm'>
-  <HeartIcon className='h-4 w-4' />
-  <span>0</span>
-</div>;
-```
-
-### 3.1. 버튼 컴포넌트 만들기
-
-- `src/components/post/LikeButtion.tsx 파일` 생성
-
-```tsx
-import { HeartIcon } from 'lucide-react';
-
-export default function LikeButton() {
-  return (
-    <>
-      <div className='hover:bg-muted flex cursor-pointer items-center gap-2 rounded-xl border-1 p-2 px-4 text-sm'>
-        <HeartIcon className='h-4 w-4' />
-        <span>0</span>
-      </div>
-    </>
-  );
-}
-```
-
-### 3.2. 필요로 한 props 전달하기
-
-```tsx
-import { HeartIcon } from 'lucide-react';
-
-export default function LikeButton({
-  id,
-  likeCount,
-}: {
-  id: number;
-  likeCount: number;
-}) {
-  return (
-    <>
-      <div className='hover:bg-muted flex cursor-pointer items-center gap-2 rounded-xl border-1 p-2 px-4 text-sm'>
-        <HeartIcon className='h-4 w-4' />
-        <span>{likeCount}</span>
-      </div>
-    </>
-  );
-}
-```
-
-- `src/components/post/PostItem.tsx`
-
-```tsx
-{
-  /* 3-1. 좋아요 버튼 */
-}
-<LikeButton id={post.id} likeCount={post.like_count} />;
-```
-
-## 4. Supabase `likes 테이블` 생성
-
-### 4.1. `likes` 테이블생성
-
-- 칼럼 추가 : `post_id`, `int8`, `Null`, Not Null
-- 칼럼 추가 : `user_id`, `uuid`, `auth.uid`, Not Null
-
-### 4.2. `FK`
-
-- `public` > `posts` > `post_id` > `id` > `Cascade` > `Cascade` > Save
-
-## 5. `RPC` 생성 신청하기
-
-- 데이터 베이스에 직접 명령어를 실행하는 형식
-
-### 5.1. SQL Editor
-
-```sql
--- 원래 함수가 있다면 삭제
-DROP FUNCTION IF EXISTS toggle_post_like(bigint, uuid);
-
--- RPC로 호출할, 새로운 함수 생성
-CREATE OR REPLACE FUNCTION toggle_post_like(p_post_id BIGINT, p_user_id UUID)
-RETURNS BOOLEAN
-SECURITY DEFINER
-AS $$
-BEGIN
-  -- 포스트 존재 확인 & 행 잠금
-  IF NOT EXISTS (
-    SELECT 1 FROM posts
-    WHERE id = p_post_id
-    FOR UPDATE
-  ) THEN
-    RAISE EXCEPTION '존재하지 않는 게시글입니다' USING ERRCODE = 'P0001';
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM "likes"
-    WHERE post_id = p_post_id AND user_id = p_user_id
-  ) THEN
-    -- 좋아요 기록 추가
-    INSERT INTO "likes" (post_id, user_id)
-    VALUES (p_post_id, p_user_id);
-
-    -- 좋아요 카운트 증가
-    UPDATE posts
-    SET like_count = like_count + 1
-    WHERE id = p_post_id;
-
-    -- TRUE 반환
-    RETURN TRUE;
-  ELSE
-    -- 좋아요 기록 삭제
-    DELETE FROM "likes"
-    WHERE post_id = p_post_id AND user_id = p_user_id;
-
-    -- 좋아요 카운트 감소
-    UPDATE posts
-    SET like_count = like_count - 1
-    WHERE id = p_post_id;
-
-    -- FALSE 반환
-    RETURN FALSE;
-  END IF;
-END;
-$$ LANGUAGE plpgsql;
-```
-
-### 5.2. 등록 확인
-
-- `Database` > `Functions` > `toggle_post_like` 항목확인
-
-## 6. 테이블의 타입 추출
-
-```bash
-npx supabase login
-npm run generate-types
-```
-
-### 6.1. 생성된 타입에서 내용확인하기
-
-- Function 확인 : `toggle_post_like`
-
-### 6.2. 타입을 편리하게 활용
-
-- `src/types/types.ts` 추가
-
-```ts
-// 좋아요 기능
-export type LikeEntity = Database['public']['Tables']['likes']['Row'];
-export type InsertLikeEntity = Database['public']['Tables']['likes']['Insert'];
-export type UpdateLikeEntity = Database['public']['Tables']['likes']['Update'];
-export type LikeTableEntity = Database['public']['Tables']['likes'];
-```
-
-## 7. API 구현하기
-
-- `src/apis/post.ts` 추가
-
-```ts
-// 7. 좋아요 토글 :RPC 활용
-export async function togglePostLike({
-  postId,
-  userId,
-}: {
-  postId: number;
-  userId: string;
-}) {
-  const { data, error } = await supabase.rpc('toggle_post_like', {
-    p_post_id: postId,
-    p_user_id: userId,
-  });
-  if (error) throw error;
-  return data;
-}
-```
-
-## 8. Mutation 구현하기
-
-- `src/hooks/mutations/post/useToggleLike.ts 파일` 생성
-
-```ts
-import { useMutation } from '@tanstack/react-query';
-import { togglePostLike } from '@/apis/post';
-import { UseMutationCallback } from '@/types/types';
-
-export function useTogglePostLike(callback?: UseMutationCallback) {
-  return useMutation({
-    mutationFn: togglePostLike,
-    onSuccess: () => {
-      if (callback?.onSuccess) callback.onSuccess();
-    },
-    onError: error => {
-      if (callback?.onError) callback.onError(error);
-    },
-  });
-}
-```
-
-## 9. 활용하기
-
-- `src/components/post/LikeButton.tsx` 업데이트
-
-```tsx
-import { useTogglePostLike } from '@/hooks/mutations/post/useToggleLike';
 import { useSession } from '@/stores/session';
-import { HeartIcon } from 'lucide-react';
+import { redirect } from 'next/navigation';
+import { useEffect, useState } from 'react';
+```
 
-export default function LikeButton({
-  id,
-  likeCount,
-}: {
-  id: number;
-  likeCount: number;
-}) {
-  const session = useSession();
+```tsx
+// 로그인 이후 이동
+// 이미 로그인된 사용자는 홈으로 리다이렉트
+const session = useSession();
+useEffect(() => {
+  if (session) {
+    redirect('/');
+  }
+}, [session]);
+```
 
-  const { mutate: togglePostLike } = useTogglePostLike();
+## 2. Profile UI 구현하기
 
-  const handleLikeClick = () => {
-    togglePostLike({
-      postId: id,
-      userId: session!.user.id,
-    });
+### 2.1. 프로필 페이지로 이동하기 링크
+
+- 포스트의 `아바타 이미지` 클릭시 이동
+- `src/components/post/PostItem.tsx` 링크 추가
+
+```tsx
+{
+  /* 사용자 페이지 이동하기 */
+}
+<Link href={`/profile/${post.author.id}`}>
+  <Image
+    src={post.author.avatar_url || defaultAvatar}
+    alt={`${post.author.nickname}의 프로필 이미지`}
+    className='h-10 w-10 rounded-full object-cover'
+    width={40}
+    height={40}
+  />
+</Link>;
+```
+
+### 2.2. 프로필 페이지 UI 구성
+
+- `src/app/(protected)/profile/[id]/page.tsx`
+
+### 2.3. 유효하지 않은 프로필 페이지 처리하기
+
+```tsx
+import { redirect } from 'next/navigation';
+
+interface ProfileDetailProps {
+  params: {
+    id: string;
   };
+}
 
+function ProfileDetail({ params }: ProfileDetailProps) {
+  const { id } = params;
+  // id 파라메터를 검증
+  if (!id || id.trim() === '') {
+    redirect('/');
+  }
+
+  return <div>{id} ProfileDetail</div>;
+}
+
+export default ProfileDetail;
+```
+
+### 2.4. 프로필 페이지 middleware.ts 에서 처리하기
+
+- `src/middleware.ts` 업데이트
+- `URI 를 처리하기 전`에 즉, `/src/app/ 으로 페이지 이동전에 중간에서 처리`한다.
+
+- 1 단계
+
+```ts
+export const config = {
+  matcher: ['/reset-password', '/', '/profile/:path*'],
+};
+```
+
+- 2 단계
+
+```ts
+// profile 경로에서 유효하지 않은 id 처리
+// /profile/ 또는 /profile/undefined 같은 경우 처리
+if (pathname === '/profile' || pathname === '/profile/') {
+  return NextResponse.redirect(new URL('/', request.url));
+}
+
+const profileMatch = pathname.match(/^\/profile\/(.+)$/);
+if (profileMatch) {
+  const profileId = profileMatch[1];
+  // id가 없거나 빈 문자열이거나 'undefined' 문자열인 경우
+  if (
+    !profileId ||
+    profileId.trim() === '' ||
+    profileId === 'undefined' ||
+    profileId === 'null'
+  ) {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+}
+```
+
+- 전체코드
+
+```ts
+import { type NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/middleware';
+
+export async function middleware(request: NextRequest) {
+  // 사용자가 어느 주소로 왔는가?
+  const { pathname } = request.nextUrl;
+
+  // profile 경로에서 유효하지 않은 id 처리
+  // /profile/ 또는 /profile/undefined 같은 경우 처리
+  if (pathname === '/profile' || pathname === '/profile/') {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  const profileMatch = pathname.match(/^\/profile\/(.+)$/);
+  if (profileMatch) {
+    const profileId = profileMatch[1];
+    // id가 없거나 빈 문자열이거나 'undefined' 문자열인 경우
+    if (
+      !profileId ||
+      profileId.trim() === '' ||
+      profileId === 'undefined' ||
+      profileId === 'null'
+    ) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+  }
+
+  // reset-password 경로 특별 처리
+  if (pathname === '/reset-password') {
+    const { supabase, response } = createClient(request);
+
+    // 세션 확인
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    // recovery 세션이 없으면 signin으로 리다이렉트
+    if (!session) {
+      return NextResponse.redirect(new URL('/signin', request.url));
+    }
+
+    // recovery 세션이 있으면 통과
+    return response;
+  }
+
+  // 루트 경로 접근 시 세션 체크
+  if (pathname === '/') {
+    const { supabase, response } = createClient(request);
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    // 세션이 없으면 signin으로 리다이렉트
+    if (!session) {
+      return NextResponse.redirect(new URL('/signin', request.url));
+    }
+
+    // 세션이 있으면 통과
+    return response;
+  }
+
+  // 다른 경로는 그대로 통과
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ['/reset-password', '/', '/profile/:path*'],
+};
+```
+
+### 2.5. 프로필 페이지 UI 작업 진행 - 사용자 프로필 컴포넌트
+
+- `src/components/profile` 폴더 생성
+- `src/components/profile/ProfileInfo.tsx` 파일 생성
+
+```tsx
+'use client';
+import useProfileData from '@/hooks/queries/useProfileData';
+import FallBack from '../FallBack';
+import Loader from '../Loader';
+import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
+import Image from 'next/image';
+
+export default function ProfileInfo({ userId }: { userId: string }) {
+  const {
+    data: profile,
+    error: fetchProfileError,
+    isPending: isFetchingProfile,
+  } = useProfileData(userId);
+  if (fetchProfileError) return <FallBack />;
+  if (isFetchingProfile) return <Loader />;
   return (
-    <>
-      <div
-        onClick={handleLikeClick}
-        className='hover:bg-muted flex cursor-pointer items-center gap-2 rounded-xl border-1 p-2 px-4 text-sm'
-      >
-        <HeartIcon className='h-4 w-4' />
-        <span>{likeCount}</span>
+    <div className='flex flex-col items-center  justify-center gap-5'>
+      <Image
+        src={profile?.avatar_url || defaultAvatar}
+        alt={`${profile?.nickname}의 프로필 이미지`}
+        className='h-30 w-30 rounded-full object-cover'
+        width={120}
+        height={120}
+      />
+      <div className='flex flex-col items-center gap-2'>
+        <div className='text-l font-bold'>{profile?.nickname}</div>
+        <div className=' text-muted-foreground'>{profile?.bio}</div>
+        <div className='text-muted-foreground'>{profile?.role}</div>
       </div>
-    </>
+    </div>
   );
 }
 ```
 
-## 10. 목록에 likes 상태 표시하기
+### 2.6. 프로필 페이지 UI 작업 진행 - 사용자 프로필 정보 출력
 
-### 10.1. API 업데이트 하기
+- `src/app/(protected)/profile/[id]/page.tsx` : 컴포넌트 출력
 
-- `src/apis/post.ts` 업데이트
-
-```ts
-// 5. 포스트 목록 조회 : like 관련내용도 가져옴
-export async function fetchPosts({
-  from,
-  to,
-  userId,
-}: {
-  from: number;
-  to: number;
-  userId: string;
-}) {
-  const { data, error } = await supabase
-    .from('posts')
-    .select('*, author: profiles!author_id(*), myLiked: likes!post_id(*)')
-    .eq('myLiked.user_id', userId)
-    .order('created_at', { ascending: false })
-    .range(from, to);
-
-  if (error) throw error;
-  return data.map(post => ({
-    ...post,
-    isLiked: post.myLiked && post.myLiked.length > 0,
-  }));
-}
+```tsx
+return (
+  <div className='flex flex-col gap-10'>
+    <ProfileInfo userId={id} />
+    <div className='border-b' />
+  </div>
+);
 ```
 
-```ts
-// 6. 포스트 하나 조회
-export async function fetchPostById({
-  postId,
-  userId,
-}: {
-  postId: number;
-  userId: string;
-}) {
-  const { data, error } = await supabase
-    .from('posts')
-    .select('*, author: profiles!author_id(*), myLiked: likes!post_id(*)')
-    .eq('myLiked.user_id', userId)
-    .eq('id', postId)
-    .single();
-  if (error) throw error;
-  return {
-    ...data,
-    isLiked: data.myLiked && data.myLiked.length > 0,
+- 전체코드
+
+```tsx
+import ProfileInfo from '@/components/profile/ProfileInfo';
+import { redirect } from 'next/navigation';
+
+interface ProfileDetailProps {
+  params: {
+    id: string;
   };
 }
+
+async function ProfileDetail({ params }: ProfileDetailProps) {
+  const { id } = await params;
+  // id 파라메터를 검증
+  if (!id || id.trim() === '') {
+    redirect('/');
+  }
+
+  return (
+    <div className='flex flex-col gap-10'>
+      <ProfileInfo userId={id} />
+      <div className='border-b' />
+    </div>
+  );
+}
+
+export default ProfileDetail;
 ```
 
-### 10.2 타입에서 post 에 Like 의 타입도 포함한 형태로 업데이트
+### 2.7. 프로필 페이지 UI 작업 진행 - 사용자 포스트 리스트 출력
 
-- `src/types/types.ts` 업데이트
+- `src/app/(protected)/profile/[id]/page.tsx` : 컴포넌트 출력
+- 전체코드
 
-```ts
-// 포스트와 프로필 타입 조합
-export type Post = PostEntity & { author: ProfileEntity; isLiked: boolean };
+```tsx
+import PostFeed from '@/components/post/PostFeed';
+import ProfileInfo from '@/components/profile/ProfileInfo';
+import { redirect } from 'next/navigation';
+
+interface ProfileDetailProps {
+  params: {
+    id: string;
+  };
+}
+
+async function ProfileDetail({ params }: ProfileDetailProps) {
+  const { id } = await params;
+  // id 파라메터를 검증
+  if (!id || id.trim() === '') {
+    redirect('/');
+  }
+
+  return (
+    <div className='flex flex-col gap-10'>
+      {/* 사용자 정보 출력 */}
+      <ProfileInfo userId={id} />
+      <div className='border-b' />
+      {/* 사용자 포스트 리스트 출력 */}
+      <PostFeed />
+    </div>
+  );
+}
+
+export default ProfileDetail;
 ```
 
-### 10.3. 호출 수정
+### 2.8. 프로필 페이지 UI 작업 진행 - `특정 사용자 기준 포스트` 출력
 
-- `/src/hooks/queries/useInfinitePostData.ts`
+- `src/components/post/PostFeed.tsx` 수정
+- Props 추가 : `authorId?: string`
+
+```tsx
+export default function PostFeed({ authorId }: { authorId?: string }) {
+  const { data, error, isPending, fetchNextPage, isFetchingNextPage } =
+    useInfinitePostData(authorId);
+```
+
+- `src/hooks/queries/useInfinitePostData.ts` 수정
 
 ```ts
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
@@ -338,8 +322,8 @@ import { fetchPosts } from '@/apis/post';
 import { useSession } from '@/stores/session';
 const PAGE_SIZE = 5;
 
-export function useInfinitePostData() {
-  // 1. 쿼리클라이언트 불러오기
+//  authorId?: string 포스트의 작성자 아이디 매개변수 전달
+export function useInfinitePostData(authorId?: string) {
   const queryClient = useQueryClient();
 
   //  like 추가 적용 : 사용자 정보
@@ -352,16 +336,18 @@ export function useInfinitePostData() {
       const from = pageParam * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
-      //  like 추가 적용 : 사용자 정보
-      const posts = await fetchPosts({ from, to, userId: session!.user.id });
+      // authorId 포스트 작성자의 아이디도 전달
+      const posts = await fetchPosts({
+        from,
+        to,
+        userId: session!.user.id,
+        authorId,
+      });
 
-      //2. 캐시 저장
       posts.forEach(post => {
         queryClient.setQueryData(QUERY_KEYS.posts.byId(post.id), post);
       });
 
-      //3. 리턴
-      //return posts;
       return posts.map(post => post.id);
     },
     initialPageParam: 0,
@@ -369,156 +355,257 @@ export function useInfinitePostData() {
       if (lastPage.length < PAGE_SIZE) return undefined;
       return allPages.length;
     },
-    //옵션들 : stale 상태로 안감
     staleTime: Infinity,
   });
 }
 ```
 
-- `src/hooks/queries/usePostByIdData.ts` 업데이트
+- `src/apis/post.ts` 매개변수 변경
 
 ```ts
-import { useQuery } from '@tanstack/react-query';
-import { QUERY_KEYS } from '@/lib/constants';
-import { fetchPostById } from '@/apis/post';
-import { useSession } from '@/stores/session';
-
-// 매겨변수의 순서가 중요하므로
-export function usePostByIdData({
-  postId,
-  type,
+// 5. 포스트 목록 조회 :  likes 관련 내용도 추가
+export async function fetchPosts({
+  from,
+  to,
+  userId,
+  authorId, // 추가됨
 }: {
-  postId: number;
-  type: 'FEED' | 'DETAIL';
+  from: number;
+  to: number;
+  userId: string;
+  authorId?: string; // 추가됨
 }) {
-  const session = useSession();
+  // authorId 가 있으면 추가적으로   Query 추가
+  // const { data, error } = await supabase
+  const request = supabase
+    .from('posts')
+    .select('*, author: profiles!author_id(*), myLiked: likes!post_id(*)')
+    .eq('myLiked.user_id', userId)
+    .order('created_at', { ascending: false })
+    .range(from, to);
 
-  return useQuery({
-    queryKey: QUERY_KEYS.posts.byId(postId),
-    // like 기능 업데이트
-    queryFn: () => fetchPostById({ postId: postId, userId: session!.user.id }),
-    enabled: type === 'FEED' ? false : true,
-  });
+  // 추가됨.
+  if (authorId) request.eq('author_id', authorId);
+  // 추가됨. await 주의함
+  const { data, error } = await request;
+
+  if (error) throw error;
+  return data.map(post => ({
+    ...post,
+    isLiked: post.myLiked && post.myLiked.length > 0,
+  }));
 }
 ```
 
-## 11. 아이콘에 색칠하기
-
-- `src/components/post/PostItem.tsx` 업데이트
+- `src/app/(protected)/profile/[id]/page.tsx` : Props 전달하기
 
 ```tsx
-<LikeButton id={post.id} likeCount={post.like_count} isLiked={post.isLiked} />
-```
+import PostFeed from '@/components/post/PostFeed';
+import ProfileInfo from '@/components/profile/ProfileInfo';
+import { redirect } from 'next/navigation';
 
-- `src/components/post/LikeButton.tsx` 업데이트
-
-```tsx
-import { useTogglePostLike } from '@/hooks/mutations/post/useToggleLike';
-import { useSession } from '@/stores/session';
-import { HeartIcon } from 'lucide-react';
-
-export default function LikeButton({
-  id,
-  likeCount,
-  isLiked,
-}: {
-  id: number;
-  likeCount: number;
-  isLiked: boolean;
-}) {
-  const session = useSession();
-
-  const { mutate: togglePostLike } = useTogglePostLike();
-
-  const handleLikeClick = () => {
-    togglePostLike({
-      postId: id,
-      userId: session!.user.id,
-    });
+interface ProfileDetailProps {
+  params: {
+    id: string;
   };
+}
+
+async function ProfileDetail({ params }: ProfileDetailProps) {
+  const { id } = await params;
+  // id 파라메터를 검증
+  if (!id || id.trim() === '') {
+    redirect('/');
+  }
 
   return (
+    <div className='flex flex-col gap-10'>
+      {/* 사용자 정보 출력 */}
+      <ProfileInfo userId={id} />
+      <div className='border-b' />
+      {/* 사용자 포스트 리스트 출력 */}
+      <PostFeed authorId={id} />
+    </div>
+  );
+}
+
+export default ProfileDetail;
+```
+
+### 2.9. `첫 화면에 목록 오류 개선`하기
+
+- `src/lib/constants.ts` 쿼리키 추가
+
+```ts
+  // 포스트 useQuery 키 생성 및 관리
+  posts: {
+    all: ['posts'],
+    list: ['posts', 'list'],
+    byId: (postId: number) => ['posts', 'byId', postId],
+    // 추가됨
+    userList: (userId: string) => ['posts', 'userList', userId],
+  },
+```
+
+- `src/hooks/queries/useInfinitePostData.ts` 업데이트
+
+```ts
+  // 보관하고 있는 캐시가 같이 업데이트
+    // 구분해 주자.
+    // queryKey: QUERY_KEYS.posts.list,
+
+    queryKey: !authorId
+      ? QUERY_KEYS.posts.list
+      : QUERY_KEYS.posts.userList(authorId),
+```
+
+### 2.10. UI 개선
+
+- 스크롤바 위치 개선
+- `src/components/profile/ProfileInfo.tsx` 추가
+
+```tsx
+useEffect(() => {
+  window.scrollTo({ top: 0 });
+}, []);
+```
+
+## 3. 프로필 및 로그아웃 버튼 구현하기
+
+- `src/app/layout.tsx`
+- 수정전 코드
+
+```tsx
+<Image
+  src={defaultAvatar}
+  alt='기본 아바타'
+  width={24}
+  height={24}
+  className='h-6'
+/>
+```
+
+- 수정후
+
+```tsx
+<ProfileButton />
+```
+
+### 3.1. 컴포넌트로 추출하기
+
+- `src/components/header 폴더` 생성
+- `src/components/header/ProfileButton.tsx` 파일 생성
+
+```tsx
+import Image from 'next/image';
+import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
+
+export default function ProfileButton() {
+  return (
     <>
-      <div
-        onClick={handleLikeClick}
-        className='hover:bg-muted flex cursor-pointer items-center gap-2 rounded-xl border-1 p-2 px-4 text-sm'
-      >
-        <HeartIcon
-          className={`h-4 w-4 ${isLiked ? 'fill-foreground border-foreground' : ''}`}
-        />
-        <span>{likeCount}</span>
-      </div>
+      <Image
+        src={defaultAvatar}
+        alt='기본 아바타'
+        width={24}
+        height={24}
+        className='h-6'
+      />
     </>
   );
 }
 ```
 
-## 12. 낙관적 업데이트
+### 3.2. 프로필 버튼 컴포넌트 업데이트
 
-- `미리 사용자의 예상을 적용` 후 사후 처리 진행
-- 명령을 실행할 때 미리 캐시를 업데이트 해 준다.
-- `onMutate` 에 핸들러에 미리 적용함.
-- `src/hooks/mutations/post/useToggleLike.ts`
+- `src/components/header/ProfileButton.tsx` 업데이트
 
-```ts
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { togglePostLike } from '@/apis/post';
-import { Post, UseMutationCallback } from '@/types/types';
-import { QUERY_KEYS } from '@/lib/constants';
+```tsx
+'use client';
+import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
+import { useSession } from '@/stores/session';
+import { PopoverClose } from '@radix-ui/react-popover';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import Image from 'next/image';
+import useProfileData from '@/hooks/queries/useProfileData';
+import Link from 'next/link';
 
-export function useTogglePostLike(callback?: UseMutationCallback) {
-  // 캐시의 모든 것이 관리 되는 구조
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: togglePostLike,
-    // onMutate 에서는 mutate 함수의 매개변수를 받을 수 있다.
-    onMutate: async ({ postId }) => {
-      // 캐시를 업데이트해서 렌더링 시켜줌.
-      // 쿼리를 가져오기 중지 : key 값을 이용함
-      await queryClient.cancelQueries({
-        queryKey: QUERY_KEYS.posts.byId(postId),
-      });
-      // 이전에 값을 보관해줌. 오류 시 복원의 용도로 활용
-      const prevPost = queryClient.getQueryData<Post>(
-        QUERY_KEYS.posts.byId(postId)
-      );
-      // 우선 캐시를 마치 원하는 결과가 반영된 것처럼 캐시를 업데이트 한다.
-      queryClient.setQueryData<Post>(QUERY_KEYS.posts.byId(postId), post => {
-        if (!post) throw new Error(`해당하는 포스트가 존재하지 않습니다.`);
-        return {
-          ...post,
-          isLiked: !post.isLiked,
-          like_count: post.isLiked ? post.like_count - 1 : post.like_count + 1,
-        };
-      });
-      // 이전 데이터 복원용
-      return { prevPost };
-    },
-
-    onSuccess: () => {
-      if (callback?.onSuccess) callback.onSuccess();
-    },
-    onError: (error, _, context) => {
-      // 타입 좁히기로 잘 접근해줌
-      if (context && context?.prevPost) {
-        queryClient.setQueryData<Post>(
-          QUERY_KEYS.posts.byId(context.prevPost.id),
-          context.prevPost
-        );
-      }
-      if (callback?.onError) callback.onError(error);
-    },
-  });
+export default function ProfileButton() {
+  const session = useSession();
+  const { data: profile } = useProfileData(session?.user.id);
+  if (!session) return null;
+  return (
+    <Popover>
+      <PopoverTrigger>
+        <Image
+          src={profile?.avatar_url || defaultAvatar}
+          alt='기본 아바타'
+          width={24}
+          height={24}
+          className='h-6 w-6 rounded-full object-cover'
+        />
+      </PopoverTrigger>
+      <PopoverContent className='flex w-40 flex-col p-0'>
+        <PopoverClose asChild>
+          <Link href={`/profile/${session.user.id}`}>
+            <div className='hover:bg-muted cursor-pointer px-4 py-3 text-sm'>
+              프로필
+            </div>
+          </Link>
+        </PopoverClose>
+        <PopoverClose asChild>
+          <div className='hover:bg-muted cursor-pointer px-4 py-3 text-sm'>
+            로그아웃
+          </div>
+        </PopoverClose>
+      </PopoverContent>
+    </Popover>
+  );
 }
 ```
 
-## 13. RLS 적용하기
+### 3.3. 로그아웃 구현 하기
 
-- supabase > tables > likes
-- Authentication > Policies > Enable RLS 버튼 > 확인
-- Authentication > Policies > Create policy 버튼 > 확인
-- `Users can select own like` > `SELECT` > `authenticated` > `(select auth.uid()) = user_id` > Save Policy 버튼
-- `Users can insert own like` > `INSERT` > `authenticated` > `(select auth.uid()) = user_id` > Save Policy 버튼
-- `Users can update own like` > `UPDATE` > `authenticated` > `(select auth.uid()) = user_id`> `(select auth.uid()) = user_id` > Save Policy 버튼
-- `Users can delete own like` > `DELETE` > `authenticated` > `(select auth.uid()) = user_id` > Save Policy 버튼
+- `src/apis/auth.ts` 기능 추가
+
+```ts
+// 로그아웃
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    await supabase.auth.signOut({
+      scope: 'local',
+    });
+  }
+}
+```
+
+- `src/components/header/ProfileButton.tsx` 추가
+
+```tsx
+<div
+  onClick={signOut}
+  className='hover:bg-muted cursor-pointer px-4 py-3 text-sm'
+>
+  로그아웃
+</div>
+```
+
+### 3.4. 로그아웃 성공시 화면 이동하기
+
+- `src/components/provider/SessionProvider.tsx` 기능추가
+
+```tsx
+useEffect(() => {
+  // 사용자가 로그인, 로그아웃을 하면 자동실행 이벤트 핸들러
+  supabase.auth.onAuthStateChange((event, session) => {
+    setSession(session);
+    //로그아웃 진행시
+    if (event === 'SIGNED_OUT') {
+      redirect('/signin');
+    }
+  });
+}, [session]);
+```
