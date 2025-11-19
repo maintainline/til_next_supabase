@@ -4,37 +4,44 @@ import {
   CarouselContent,
   CarouselItem,
 } from '@/components/ui/carousel';
+import { usePostByIdData } from '@/hooks/queries/usePostByIdData';
 import { formatTimeAgo } from '@/lib/time';
-import type { Post } from '@/types/types';
-import { HeartIcon, MessageCircle } from 'lucide-react';
+import { useSession } from '@/stores/session';
+import { MessageCircle } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
+import FallBack from '../FallBack';
+import Loader from '../Loader';
 import DeletePostButton from './DeletePostButton';
 import { EditPostItemButton } from './EditPostItemButton';
-import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
-import { useSession } from '@/stores/session';
-import { usePostByIdData } from '@/hooks/queries/usePostByIdData';
-import Loader from '../Loader';
-import FallBack from '../FallBack';
 import LikeButton from './LikeButtion';
-import Link from 'next/link';
+import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
 
-export default function PostItem({ postId }: { postId: number }) {
-  // 내가 만든 post 인지 확인
+export default function PostItem({
+  postId,
+  type,
+}: {
+  postId: number;
+  type: 'FEED' | 'DETAIL';
+}) {
   const session = useSession();
   const userId = session?.user.id;
-  // 실제 쿼리로 id 를 전달해서 post 를 가져오자.
   const {
     data: post,
     isPending,
     error,
-  } = usePostByIdData({ postId, type: 'FEED' });
+    // } = usePostByIdData({ postId, type: 'FEED' });
+    // type 을 외부로 부터 전달 받도록 구성
+  } = usePostByIdData({ postId, type: type });
   if (isPending) return <Loader />;
   if (error) return <FallBack />;
 
   const isMine = userId === post.author.id;
 
   return (
-    <div className='flex flex-col gap-4 border-b pb-8'>
+    <div
+      className={`flex flex-col gap-4  pb-8 ${type === 'FEED' && 'border-b'}`}
+    >
       <div className='flex justify-between'>
         <div className='flex items-start gap-4'>
           {/* 사용자 페이지 이동하기 */}
@@ -50,10 +57,13 @@ export default function PostItem({ postId }: { postId: number }) {
 
           <div>
             <div className='font-bold hover:underline'>
-              {post.author.nickname}
+              <Link href={`/profile/${post.author.id}`}>
+                {post.author.nickname}
+              </Link>
             </div>
             <div className='text-muted-foreground text-sm'>
               {formatTimeAgo(post.created_at)}
+
               {/* {new Date(post.created_at).toLocaleString()} */}
             </div>
           </div>
@@ -70,12 +80,16 @@ export default function PostItem({ postId }: { postId: number }) {
         </div>
       </div>
 
-      {/* 2. 컨텐츠, 이미지 캐러셀 */}
       <div className='flex cursor-pointer flex-col gap-5'>
-        {/* 2-1. 컨텐츠 */}
-        <div className='line-clamp-2 break-words whitespace-pre-wrap'>
-          {post.content}
-        </div>
+        {type === 'FEED' ? (
+          <Link href={`/post/${post.id}`}>
+            <div className='line-clamp-2 break-words whitespace-pre-wrap'>
+              {post.content}
+            </div>
+          </Link>
+        ) : (
+          <div className='break-words whitespace-pre-wrap'>{post.content}</div>
+        )}
 
         {/* 2-2. 이미지 캐러셀 */}
         <Carousel>
@@ -104,10 +118,12 @@ export default function PostItem({ postId }: { postId: number }) {
         />
 
         {/* 3-2. 댓글 버튼 */}
-        <div className='hover:bg-muted flex cursor-pointer items-center gap-2 rounded-xl border-1 p-2 px-4 text-sm'>
-          <MessageCircle className='h-4 w-4' />
-          <span>댓글 달기</span>
-        </div>
+        <Link href={`/post/${post.id}`}>
+          <div className='hover:bg-muted flex cursor-pointer items-center gap-2 rounded-xl border-1 p-2 px-4 text-sm'>
+            <MessageCircle className='h-4 w-4' />
+            <span>댓글 달기</span>
+          </div>
+        </Link>
       </div>
     </div>
   );
