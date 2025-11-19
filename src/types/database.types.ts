@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      comments: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: number
+          post_id: number
+        }
+        Insert: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: number
+          post_id: number
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: number
+          post_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       likes: {
         Row: {
           created_at: string

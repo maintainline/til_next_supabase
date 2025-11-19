@@ -21,6 +21,14 @@ export type InsertLikeEntity = Database['public']['Tables']['likes']['Insert'];
 export type UpdateLikeEntity = Database['public']['Tables']['likes']['Update'];
 export type LikeTableEntity = Database['public']['Tables']['likes'];
 
+// 댓글 기능
+export type CommentEntity = Database['public']['Tables']['comments']['Row'];
+export type InsertCommentEntity =
+  Database['public']['Tables']['comments']['Insert'];
+export type UpdateCommentEntity =
+  Database['public']['Tables']['comments']['Update'];
+export type CommentTableEntity = Database['public']['Tables']['comments'];
+
 export type UseMutationCallback = {
   onError?: (error: Error) => void;
   onSuccess?: () => void;
