@@ -17,8 +17,8 @@ async function PostDetail({ params }: PostDetailProps) {
     <div className='flex flex-col gap-5'>
       <PostItem postId={Number(id)} type={'DETAIL'} />
       <div className='text-xl font-bold'>댓글</div>
-      <CommentEditor />
-      <CommentList />
+      <CommentEditor type='CREATE' postId={Number(id)} />
+      <CommentList postId={Number(id)} />
     </div>
   );
 }

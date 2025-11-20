@@ -14,6 +14,11 @@ export const QUERY_KEYS = {
     // 추가됨
     userList: (userId: string) => ['posts', 'userList', userId],
   },
+  // 댓글 useQuery 키 생성 및 관리
+  comments: {
+    all: ['comments'],
+    post: (postId: number) => ['comments', 'post', postId],
+  },
 };
 
 // 버킷 이름 : Supabase Storage 저장소

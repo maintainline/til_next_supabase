@@ -29,6 +29,9 @@ export type UpdateCommentEntity =
   Database['public']['Tables']['comments']['Update'];
 export type CommentTableEntity = Database['public']['Tables']['comments'];
 
+// 댓글과 프로필 타입 조합
+export type Comment = CommentEntity & { author: ProfileEntity };
+
 export type UseMutationCallback = {
   onError?: (error: Error) => void;
   onSuccess?: () => void;
