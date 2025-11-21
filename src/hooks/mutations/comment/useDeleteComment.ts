@@ -8,6 +8,7 @@ export function useDeleteComment(callback?: UseMutationCallback) {
 
   return useMutation({
     mutationFn: deleteComment,
+    
     // 삭제 성공된 리턴 결과를 자동 매개변수로 전달
     onSuccess: deletedComment => {
       if (callback?.onSuccess) callback.onSuccess();
