@@ -24,7 +24,9 @@ export function useCreateComment(callback?: UseMutationCallback) {
           if (!comments) throw new Error('댓글 목록을 찾을 수 없습니다.');
           if (!profile) throw new Error('사용자 정보를 찾을 수 없습니다.');
 
-          return [{ ...newComment, author: profile }, ...comments];
+          // return [{ ...newComment, author: profile }, ...comments];
+          // 새로운 댓글을 배열의 뒤에 추가형태 반영
+          return [...comments, { ...newComment, author: profile }];
         }
       );
     },

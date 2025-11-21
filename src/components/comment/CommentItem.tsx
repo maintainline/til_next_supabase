@@ -1,18 +1,19 @@
 'use client';
-import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
 import Image from 'next/image';
 import Link from 'next/link';
+import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
 // 타입만 import
-import type { Comment } from '@/types/types';
-import { formatTimeAgo } from '@/lib/time';
-import { useSession } from '@/stores/session';
-import { useState } from 'react';
-import CommentEditor from './CommentEditor';
 import { useDeleteComment } from '@/hooks/mutations/comment/useDeleteComment';
-import { toast } from 'sonner';
+import { formatTimeAgo } from '@/lib/time';
 import { useOpenAlertModal } from '@/stores/alertModalStore';
+import { useSession } from '@/stores/session';
+import type { NestedComment } from '@/types/types';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import CommentEditor from './CommentEditor';
 
-export default function CommentItem(props: Comment) {
+// export default function CommentItem(props: Comment) {
+export default function CommentItem(props: NestedComment) {
   const session = useSession();
 
   // 삭제 mutation
@@ -32,6 +33,12 @@ export default function CommentItem(props: Comment) {
     setIsEditing(prev => !prev);
   };
 
+  // 대댓글 상태관리
+  const [isReplying, setIsReplying] = useState(false);
+  const toggleReply = () => {
+    setIsReplying(prev => !prev);
+  };
+
   const handleDeleteComment = () => {
     openAlertModal({
       title: '댓글 삭제',
@@ -47,8 +54,16 @@ export default function CommentItem(props: Comment) {
 
   const isMine = session?.user.id === props.author.id;
 
+  // ui/ux 적용 : 일반적 댓글인지, 대댓글인지를 정의함
+  const isRootComment = props.parentComment === undefined;
+
+  // 대댓글의 해시태그 출력을 위한 파악
+  const isOverTwoLevels = props.parent_comment_id !== props.root_comment_id;
+
   return (
-    <div className={'flex flex-col gap-8  border-b pb-5'}>
+    <div
+      className={`flex flex-col gap-8 pb-5 ${isRootComment ? 'border-b' : 'ml-8'}`}
+    >
       <div className='flex items-start gap-4'>
         <Link href={'#'}>
           <div className='flex h-full flex-col'>
@@ -72,12 +87,24 @@ export default function CommentItem(props: Comment) {
               onClose={toggleEditing}
             />
           ) : (
-            <div>{props.content}</div>
+            <div>
+              {isOverTwoLevels && (
+                <span className='font-bold text-blue-500'>
+                  @{props.parentComment?.author.nickname}
+                </span>
+              )}
+              {props.content}
+            </div>
           )}
 
           <div className='text-muted-foreground flex justify-between text-sm'>
             <div className='flex items-center gap-2'>
-              <div className='cursor-pointer hover:underline'>댓글</div>
+              <div
+                onClick={toggleReply}
+                className='cursor-pointer hover:underline'
+              >
+                댓글
+              </div>
               <div className='bg-border h-[13px] w-[2px]'></div>
               <div>{formatTimeAgo(props.created_at)}</div>
             </div>
@@ -103,6 +130,22 @@ export default function CommentItem(props: Comment) {
           </div>
         </div>
       </div>
+      {/*  대댓글 영역 */}
+      {isReplying && (
+        <div className='flex flex-col gap-2'>
+          <CommentEditor
+            type='REPLY'
+            postId={props.post_id}
+            parentCommentId={props.id}
+            rootCommentId={props.root_comment_id || props.id}
+            onClose={toggleReply}
+          />
+        </div>
+      )}
+      {/* children 댓글 목록 출력 */}
+      {props.children.map(comment => (
+        <CommentItem key={comment.id} {...comment} />
+      ))}
     </div>
   );
 }

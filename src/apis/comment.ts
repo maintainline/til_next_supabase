@@ -3,13 +3,22 @@ import supabase from '@/lib/supabase/client';
 export async function createComment({
   postId,
   content,
+  parentCommentId,
+  rootCommentId,
 }: {
   postId: number;
   content: string;
+  parentCommentId?: number;
+  rootCommentId?: number;
 }) {
   const { data, error } = await supabase
     .from('comments')
-    .insert({ post_id: postId, content })
+    .insert({
+      post_id: postId,
+      content: content,
+      parent_comment_id: parentCommentId,
+      root_comment_id: rootCommentId,
+    })
     .select()
     .single();
   if (error) throw error;
@@ -22,7 +31,8 @@ export async function fetchComments(postId: number) {
     .from('comments')
     .select('*, author: profiles!author_id(*)')
     .eq('post_id', postId)
-    .order('created_at', { ascending: false });
+    // .order('created_at', { ascending: false }); //  최신순
+    .order('created_at', { ascending: true }); // 오래된 순
   if (error) throw error;
   return data;
 }
@@ -31,9 +41,11 @@ export async function fetchComments(postId: number) {
 export async function updateComment({
   id,
   content,
+  parentCommentId,
 }: {
   id: number;
   content: string;
+  parentCommentId?: number;
 }) {
   const { data, error } = await supabase
     .from('comments')
