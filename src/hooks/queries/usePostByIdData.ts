@@ -12,11 +12,14 @@ export function usePostByIdData({
   type: 'FEED' | 'DETAIL';
 }) {
   const session = useSession();
+  // 사용자 검증
+  const userId = session?.user.id;
 
   return useQuery({
     queryKey: QUERY_KEYS.posts.byId(postId),
     // like 기능 업데이트
     queryFn: () => fetchPostById({ postId: postId, userId: session!.user.id }),
-    enabled: type === 'FEED' ? false : true,
+    // 아래 업데이트
+    enabled: type === 'FEED' ? false : Boolean(userId),
   });
 }

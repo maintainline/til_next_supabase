@@ -1,576 +1,312 @@
-# Theme
+# 버그 개선
 
-- Next.js 에서 테마 로컬스토리지에 저장(`zustand 활용`)
+## 1. 프로필 수정 시 오류
 
-## 1. UI 진행
+### 1.1 사용자 아바타 이미지 변경 적용 오류
 
-- `/src/app/layout.tsx`
-
-```tsx
-{
-  /* 테마 적용 버튼 */
-}
-<div className='hover:bg-muted cursor-pointer rounded-full p-2'>
-  <Sun />
-</div>;
-```
-
-- 별도의 컴포넌트로 추출
-- `/src/components/header/ThemeButton.tsx 파일` 생성
-
-```tsx
-import { Sun } from 'lucide-react';
-
-export default function ThemeButton() {
-  return (
-    <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
-      <Sun />
-    </div>
-  );
-}
-```
-
-- `/src/app/layout.tsx`
-
-```tsx
-<div className='flex items-center gap-5'>
-  {/* 테마 적용 버튼 */}
-  <ThemeButton />
-  <ProfileButton />
-</div>
-```
-
-## 2. 선택 메뉴 추가하기
-
-- 펼침 메뉴로 테마 선택하기
-- `/src/components/header/ThemeButton.tsx`
-- 1단계
-
-```tsx
-import { Sun } from 'lucide-react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-
-// system :  사용자가 웹브라우저에 셋팅한 테마
-const THEMES = ['system', 'light', 'dark'];
-
-export default function ThemeButton() {
-  return (
-    <Popover>
-      <PopoverTrigger>
-        <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
-          <Sun />
-        </div>
-      </PopoverTrigger>
-      <PopoverContent></PopoverContent>
-    </Popover>
-  );
-}
-```
-
-- 테마 타입 정의하기 : `/src/types/types.ts`
+- `src/hooks/mutation/profile/useUpdateProfile.ts` 업데이트
 
 ```ts
-export type Theme = 'system' | 'light' | 'dark';
-```
+import { updateProfile } from '@/apis/profile';
+import { QUERY_KEYS } from '@/lib/constants';
+import { Post, ProfileEntity, UseMutationCallback } from '@/types/types';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-- 2단계 : 타입 활용
-- `/src/components/header/ThemeButton.tsx`
+export function useUpdateProfile(callback?: UseMutationCallback) {
+  // 서버의 상태
+  const queryClient = useQueryClient();
 
-```tsx
-import { Theme } from '@/types/types';
-const THEMES: Theme[] = ['system', 'light', 'dark'];
-```
+  return useMutation({
+    mutationFn: updateProfile,
 
-- 3단계 : 출력 하기 및 클릭 처리
+    // 결과값이 매개변수에 담겨짐
+    onSuccess: updatedProfile => {
+      if (callback?.onSuccess) callback.onSuccess();
 
-```tsx
-import { Sun } from 'lucide-react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+      // 캐시를 업데이트 해줌 : 리랜더링
+      queryClient.setQueryData<ProfileEntity>(
+        QUERY_KEYS.profile.byId(updatedProfile.id),
+        updatedProfile
+      );
+      // 추가로 postItem 의 avatar 이미지도 캐시변경 해야함.
+      // 피드/디테일 게시글 캐시에 남아있는 작성자 정보도 동시에 갱신한다.
+      queryClient
+        .getQueryCache()
+        .findAll({ queryKey: QUERY_KEYS.posts.all })
+        .forEach(query => {
+          if (query.queryKey[1] !== 'byId') return;
+          const cachedPost = query.state.data as Post | undefined;
+          if (!cachedPost || cachedPost.author.id !== updatedProfile.id) return;
 
-import { Theme } from '@/types/types';
-import { PopoverClose } from '@radix-ui/react-popover';
-const THEMES: Theme[] = ['system', 'light', 'dark'];
-
-export default function ThemeButton() {
-  return (
-    <Popover>
-      <PopoverTrigger>
-        <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
-          <Sun />
-        </div>
-      </PopoverTrigger>
-      <PopoverContent>
-        {THEMES.map(theme => (
-          <PopoverClose key={`theme-button-${theme}`} asChild>
-            <div>{theme}</div>
-          </PopoverClose>
-        ))}
-      </PopoverContent>
-    </Popover>
-  );
+          queryClient.setQueryData<Post>(query.queryKey, {
+            ...cachedPost,
+            author: {
+              ...cachedPost.author,
+              ...updatedProfile,
+            },
+          });
+        });
+    },
+    onError: error => {
+      if (callback?.onError) callback.onError(error);
+    },
+  });
 }
 ```
 
-- 4단계 : 스타일링
+### 1.2. 닉네임 또는 자기소개를 수정하고 적용시 `아바타 이미지 초기화`.
 
-```tsx
-<PopoverClose key={`theme-button-${theme}`} asChild>
-  <div className='hover:bg-muted cursor-pointer p-3'>{theme}</div>
-</PopoverClose>
-```
+- `src/apis/profile.ts`
 
-## 3. 테마 기능 적용하기
+```ts
+ // 3. 프로필 테이블 업데이트 작업
+  // 텍스트 필드만 바뀔 때는 기존 avatar_url을 그대로 두기 위한 payload 구성.
+  const payload: {
+    nickname: string;
+    bio?: string;
+    avatar_url?: string | null;
+  } = { nickname, bio };
 
-### 3.1. 테마 선택 기능
-
-```tsx
-// 테마선택시 실행함
-const onChangeTheme = (theme: Theme) => {};
-```
-
-```tsx
-<div
-  onClick={() => onChangeTheme(theme)}
-  className='hover:bg-muted cursor-pointer p-3'
->
-  {theme}
-</div>
-```
-
-```tsx
-'use client';
-import { Sun } from 'lucide-react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-
-import { Theme } from '@/types/types';
-import { PopoverClose } from '@radix-ui/react-popover';
-const THEMES: Theme[] = ['system', 'light', 'dark'];
-
-export default function ThemeButton() {
-  // 테마선택시 실행함
-  const onChangeTheme = (theme: Theme) => {};
-
-  return (
-    <Popover>
-      <PopoverTrigger>
-        <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
-          <Sun />
-        </div>
-      </PopoverTrigger>
-      <PopoverContent>
-        {THEMES.map(theme => (
-          <PopoverClose key={`theme-button-${theme}`} asChild>
-            <div
-              onClick={() => onChangeTheme(theme)}
-              className='hover:bg-muted cursor-pointer p-3'
-            >
-              {theme}
-            </div>
-          </PopoverClose>
-        ))}
-      </PopoverContent>
-    </Popover>
-  );
-}
-```
-
-### 3.2. 테마 적용을 위한 `html 태그 변경`
-
-```tsx
-// 테마선택시 실행함
-const onChangeTheme = (theme: Theme) => {
-  // html 의 테마 적용하는 코드로 변경
-  const htmlTag = document.documentElement;
-  // 그냥 무조건 클래스를 지운다.
-  htmlTag.classList.remove('light', 'dark');
-  htmlTag.classList.add(theme);
-};
-```
-
-### 3.3. `system` 테마 적용은 없음.
-
-- system 에 대한 예외처리 진행
-
-```tsx
-// 테마선택시 실행함
-const onChangeTheme = (theme: Theme) => {
-  // html 의 테마 적용하는 코드로 변경
-  const htmlTag = document.documentElement;
-  // 그냥 무조건 클래스를 지운다.
-  htmlTag.classList.remove('light', 'dark');
-  if (theme === 'system') {
-    // 웹브라우저에 사용자가 셋팅한 테마를 적용해야함.
-    const isDarkTheme = window.matchMedia(
-      '(prefers-color-scheme: dark)'
-    ).matches;
-    htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
-  } else {
-    htmlTag.classList.add(theme);
+  if (avatarImageFile) {
+    //이미지가 새로 업로드된 경우에만 avatar_url을 덮어쓴다.
+    payload.avatar_url = newAvatarUrl;
   }
-};
+
+  const { data, error } = await supabase
+    .from('profiles')
+    // .update({ nickname, bio, avatar_url: newAvatarUrl })
+    .update(payload)
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
 ```
 
-- 전체 코드
+## 2. 첫 로그인 직후에 리다이렉트 시 목록 오류
+
+### 2.1 해결책
+
+- `SessionPrvider` 가 `Mount` 되면 `supabase.auth.getSession()`을 활용 `즉시 현재 Session 을 담아준다.`
+- 포스트쿼리 훅에서 `userId` 가 준비 될때 까지 호출을 지연시킴
+
+### 2.2. 업데이트
+
+- `src/components/providers/SessionProvider.tsx` 업데이트
 
 ```tsx
-'use client';
-import { Sun } from 'lucide-react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+// SessionProvider 가 마운트시 즉시 세션을 동기화함.
+useEffect(() => {
+  // 이미 사용자가 로그인 해서 잘 사용하고 있다면
+  // 아래는 호출할 필요가 없어요.
+  let isMounted = true;
 
-import { Theme } from '@/types/types';
-import { PopoverClose } from '@radix-ui/react-popover';
-const THEMES: Theme[] = ['system', 'light', 'dark'];
+  const syncSession = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-export default function ThemeButton() {
-  // 테마선택시 실행함
-  const onChangeTheme = (theme: Theme) => {
-    // html 의 테마 적용하는 코드로 변경
-    const htmlTag = document.documentElement;
-    // 그냥 무조건 클래스를 지운다.
-    htmlTag.classList.remove('light', 'dark');
-    if (theme === 'system') {
-      // 웹브라우저에 사용자가 셋팅한 테마를 적용해야함.
-      const isDarkTheme = window.matchMedia(
-        '(prefers-color-scheme: dark)'
-      ).matches;
-      htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
-    } else {
-      htmlTag.classList.add(theme);
-    }
+    if (!isMounted) return;
+    isMounted = false;
+    setSession(session);
   };
 
-  return (
-    <Popover>
-      <PopoverTrigger>
-        <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
-          <Sun />
-        </div>
-      </PopoverTrigger>
-      <PopoverContent>
-        {THEMES.map(theme => (
-          <PopoverClose key={`theme-button-${theme}`} asChild>
-            <div
-              onClick={() => onChangeTheme(theme)}
-              className='hover:bg-muted cursor-pointer p-3'
-            >
-              {theme}
-            </div>
-          </PopoverClose>
-        ))}
-      </PopoverContent>
-    </Popover>
+  syncSession();
+
+  // 사용자가 로그인, 로그아웃을 하면 자동실행 이벤트 핸들러
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((event, session) => {
+    setSession(session);
+    console.log('로그아웃 또는 로그인시의 상태 체크 : ', event);
+    // 로그아웃 진행시에는
+    if (event === 'SIGNED_OUT') {
+      // redirect('/signin');
+      router.push('/signin');
+    }
+  });
+
+  // 클린업 함수
+  return () => {
+    isMounted = false;
+    subscription.unsubscribe(); // 이벤트 감지 해제
+  };
+}, [session, router]);
+```
+
+- 전체코드
+
+```tsx
+'use client';
+import useProfileData from '@/hooks/queries/useProfileData';
+import supabase from '@/lib/supabase/client';
+import { useSession, useSessionLoaded, useSetSession } from '@/stores/session';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { GlobalLoading } from '../GlobalLoading';
+
+interface SessionProviderProps {
+  children: React.ReactNode;
+}
+export default function SessionProvider({ children }: SessionProviderProps) {
+  const router = useRouter();
+
+  const session = useSession();
+  const setSession = useSetSession();
+  const isSessionLoaded = useSessionLoaded();
+  const { data: profile, isLoading: isProfileLoading } = useProfileData(
+    session?.user.id
   );
+
+  // SessionProvider 가 마운트시 즉시 세션을 동기화함.
+  useEffect(() => {
+    // 이미 사용자가 로그인 해서 잘 사용하고 있다면
+    // 아래는 호출할 필요가 없어요.
+    let isMounted = true;
+
+    const syncSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!isMounted) return;
+      isMounted = false;
+      setSession(session);
+    };
+
+    syncSession();
+
+    // 사용자가 로그인, 로그아웃을 하면 자동실행 이벤트 핸들러
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      console.log('로그아웃 또는 로그인시의 상태 체크 : ', event);
+      // 로그아웃 진행시에는
+      if (event === 'SIGNED_OUT') {
+        // redirect('/signin');
+        router.push('/signin');
+      }
+    });
+
+    // 클린업 함수
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe(); // 이벤트 감지 해제
+    };
+  }, [session, router]);
+
+  if (!isSessionLoaded) return <GlobalLoading />;
+  if (isProfileLoading) return <GlobalLoading />;
+
+  return <div>{children}</div>;
 }
 ```
 
-## 4. 새로고침시 테마 유지하기
+### 2.3. 업데이트
 
-### 4.1. Store 만들기
-
-- `/src/stores/themeStore.ts 파일` 생성
+- `src/hooks/quieries/useInfinitePostData.ts`업데이트
 
 ```ts
-import type { Theme } from '@/types/types';
-import { create } from 'zustand';
-import { combine, devtools, persist } from 'zustand/middleware';
-
-type State = {
-  theme: Theme;
-};
-
-const initialState: State = {
-  theme: 'light',
-};
-
-const useThemeStore = create(
-  devtools(
-    combine(initialState, set => ({
-      actions: {
-        setTheme: (theme: Theme) => {
-          const htmlTag = document.documentElement;
-          htmlTag.classList.remove('light', 'dark');
-          if (theme === 'system') {
-            const isDarkTheme = window.matchMedia(
-              '(prefers-color-scheme: dark)'
-            ).matches;
-
-            htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
-          } else {
-            htmlTag.classList.add(theme);
-          }
-
-          set({ theme });
-        },
-      },
-    }))
-  )
-);
-```
-
-### 4.2. 로컬스토리지에 보관하려면 `persist` 활용
-
-- middleware 의 겹침을 주의하자.
-
-```ts
-import type { Theme } from '@/types/types';
-import { create } from 'zustand';
-import { combine, devtools, persist } from 'zustand/middleware';
-
-type State = {
-  theme: Theme;
-};
-
-const initialState: State = {
-  theme: 'light',
-};
-
-const useThemeStore = create(
-  devtools(
-    persist(
-      combine(initialState, set => ({
-        actions: {
-          setTheme: (theme: Theme) => {
-            const htmlTag = document.documentElement;
-            htmlTag.classList.remove('dark', 'light');
-
-            if (theme === 'system') {
-              const isDarkTheme = window.matchMedia(
-                '(prefers-color-scheme: dark)'
-              ).matches;
-
-              htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
-            } else {
-              htmlTag.classList.add(theme);
-            }
-
-            set({ theme });
-          },
-        },
-      })),
-      {
-        name: 'ThemeStore',
-        partialize: store => ({
-          theme: store.theme,
-        }),
-      }
-    ),
-    { name: 'ThemeStore' }
-  )
-);
-
-export const useTheme = () => {
-  const theme = useThemeStore(store => store.theme);
-  return theme;
-};
-
-export const useSetTheme = () => {
-  const setTheme = useThemeStore(store => store.actions.setTheme);
-  return setTheme;
-};
-```
-
-### 4.3. 활용하기
-
-- `/src/stores/themeStore.ts` : 업데이트
-
-```ts
-// 테마 적용하기
-const applyTheme = (theme: Theme) => {
-  if (typeof window === 'undefined') return;
-
-  const htmlTag = document.documentElement;
-  htmlTag.classList.remove('dark', 'light');
-  if (theme === 'system') {
-    const isDarkTheme = window.matchMedia(
-      '(prefers-color-scheme: dark)'
-    ).matches;
-    htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
-  } else {
-    htmlTag.classList.add(theme);
-  }
-};
+// 세션이 준비 되었는지 파악한다.
+const session = useSession();
+const userId = session?.user.id;
 ```
 
 ```ts
-// localStorage 가 불러와지는 직후에 실행되는 콜백함수
-// Store 가 초기화 될때 한 번 실행되는 콜백함수
-onRehydrateStorage: () => {함수},
-// 단계별 적용 1
-onRehydrateStorage: () => (state, error) => {},
-// 단계별 적용 2
-onRehydrateStorage: () => (state, error) => {
-  if (error) {
-    console.log('로컬스토리지 에러', error);
-    return;
-  }
-  if (state?.theme) {
-    applyTheme(state.theme);
-  }
-},
+enabled: Boolean(userId), // 사용자 아이디에 대한 유무
+```
+
+```ts
+queryFn: async ({ pageParam }) => {
+  if (!userId) throw new Error('사용자 정보가 없습니다.');
 ```
 
 - 전체 코드
 
 ```ts
-import type { Theme } from '@/types/types';
-import { create } from 'zustand';
-import { combine, devtools, persist } from 'zustand/middleware';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { QUERY_KEYS } from '@/lib/constants';
+import { fetchPosts } from '@/apis/post';
+import { useSession } from '@/stores/session';
+const PAGE_SIZE = 5;
 
-type State = {
-  theme: Theme;
-};
+//  authorId?: string 포스트의 작성자 아이디 매개변수 전달
+export function useInfinitePostData(authorId?: string) {
+  const queryClient = useQueryClient();
 
-const initialState: State = {
-  theme: 'light',
-};
+  // 세션이 준비 되었는지 파악한다.
+  const session = useSession();
+  const userId = session?.user.id;
 
-// 테마 적용하기
-const applyTheme = (theme: Theme) => {
-  if (typeof window === 'undefined') return;
+  return useInfiniteQuery({
+    // queryKey: QUERY_KEYS.posts.list,
+    queryKey: !authorId
+      ? QUERY_KEYS.posts.list
+      : QUERY_KEYS.posts.userList(authorId),
 
-  const htmlTag = document.documentElement;
-  htmlTag.classList.remove('dark', 'light');
-  if (theme === 'system') {
-    const isDarkTheme = window.matchMedia(
-      '(prefers-color-scheme: dark)'
-    ).matches;
-    htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
-  } else {
-    htmlTag.classList.add(theme);
-  }
-};
+    enabled: Boolean(userId), // 사용자 아이디에 대한 유무
 
-const useThemeStore = create(
-  devtools(
-    persist(
-      combine(initialState, set => ({
-        actions: {
-          setTheme: (theme: Theme) => {
-            const htmlTag = document.documentElement;
-            htmlTag.classList.remove('dark', 'light');
+    queryFn: async ({ pageParam }) => {
+      if (!userId) throw new Error('사용자 정보가 없습니다.');
 
-            if (theme === 'system') {
-              const isDarkTheme = window.matchMedia(
-                '(prefers-color-scheme: dark)'
-              ).matches;
+      const from = pageParam * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
 
-              htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
-            } else {
-              htmlTag.classList.add(theme);
-            }
+      // authorId 포스트 작성자의 아이디도 전달
+      const posts = await fetchPosts({
+        from,
+        to,
+        userId: session!.user.id,
+        authorId,
+      });
 
-            set({ theme });
-          },
-        },
-      })),
-      {
-        name: 'ThemeStore',
-        partialize: store => ({
-          theme: store.theme,
-        }),
-        // localStorage 가 불러와지는 직후에 실행되는 콜백함수
-        // Store 가 초기화 될때 한 번 실행되는 콜백함수
-        onRehydrateStorage: () => (state, error) => {
-          if (error) {
-            console.log('로컬스토리지 에러', error);
-            return;
-          }
-          if (state?.theme) {
-            applyTheme(state.theme);
-          }
-        },
-      }
-    ),
-    { name: 'ThemeStore' }
-  )
-);
+      posts.forEach(post => {
+        queryClient.setQueryData(QUERY_KEYS.posts.byId(post.id), post);
+      });
 
-export const useTheme = () => {
-  const theme = useThemeStore(store => store.theme);
-  return theme;
-};
-
-export const useSetTheme = () => {
-  const setTheme = useThemeStore(store => store.actions.setTheme);
-  return setTheme;
-};
+      return posts.map(post => post.id);
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.length < PAGE_SIZE) return undefined;
+      return allPages.length;
+    },
+    staleTime: Infinity,
+  });
+}
 ```
 
-### 4.4. Next.js 의 적용
+### 2.4. 업데이트
 
-- `/src/app/layout.tsx` 활용함.(Next.js)
-- Next.js 에서 웹브라우저의 `외부 js 를 실시간 실행시 참조`
-- Next.js 는 Node.js 라서 웹브라우저에 보관한 localStorage를 부를 수 없다.
+- `src/hooks/quieries/usePostByIdData.ts`업데이트
 
-- 단계 1: 경고 출력하지 않기 (`서버렌더링 결과 HTML 과 클라이언트 렌더링 결과가 다를때`)
+```ts
+import { useQuery } from '@tanstack/react-query';
+import { QUERY_KEYS } from '@/lib/constants';
+import { fetchPostById } from '@/apis/post';
+import { useSession } from '@/stores/session';
 
-```tsx
-<html lang='ko' suppressHydrationWarning>
+// 매겨변수의 순서가 중요하므로
+export function usePostByIdData({
+  postId,
+  type,
+}: {
+  postId: number;
+  type: 'FEED' | 'DETAIL';
+}) {
+  const session = useSession();
+  // 사용자 검증
+  const userId = session?.user.id;
+
+  return useQuery({
+    queryKey: QUERY_KEYS.posts.byId(postId),
+    // like 기능 업데이트
+    queryFn: () => fetchPostById({ postId: postId, userId: session!.user.id }),
+    // 아래 업데이트
+    enabled: type === 'FEED' ? false : Boolean(userId),
+  });
+}
 ```
 
-- 단계 2: 문자열로 html 작성시 경고 출력 하지 않기
-
-```tsx
- <html lang='ko' suppressHydrationWarning>
-      {/* 추가 */}
-      <head>
-
-      </head>
-```
-
-```tsx
-<head>
-  <script dangerouslySetInnerHTML={} />
-</head>
-```
-
-```tsx
-<head>
-  <script dangerouslySetInnerHTML={{ __html: `` }} />
-</head>
-```
-
-```tsx
-<head>
-  <script
-    dangerouslySetInnerHTML={{
-      __html: `(function() {
-                try {
-                  const stored = localStorage.getItem('ThemeStore');
-                  if (stored) {
-                    const parsed = JSON.parse(stored);
-                    const themeValue = parsed?.state?.theme || parsed?.theme || 'light';
-                    const htmlTag = document.documentElement;
-                    htmlTag.classList.remove('dark', 'light');
-                    
-                    if (themeValue === 'system') {
-                      const isDarkTheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                      htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
-                    } else {
-                      htmlTag.classList.add(themeValue);
-                    }
-                  }
-                } catch (e) {
-                  console.error('Theme initialization error:', e);
-                }
-              })()`,
-    }}
-  />
-</head>
-```
