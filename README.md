@@ -1,1114 +1,576 @@
-# comments 댓글의 댓글
+# Theme
 
-## 1. 댓글의 댓글을 배치시 고려사항
+- Next.js 에서 테마 로컬스토리지에 저장(`zustand 활용`)
 
-- 댓글의 배치 순서가 최신순이 아님.
-- 시간이 오래된 순서로 배치하고 댓글 출력
-- `src/apis/comments.ts` 일부 옵션 조절
+## 1. UI 진행
 
-```ts
-// 2. 댓글조회
-export async function fetchComments(postId: number) {
-  const { data, error } = await supabase
-    .from('comments')
-    .select('*, author: profiles!author_id(*)')
-    .eq('post_id', postId)
-    // .order('created_at', { ascending: false }); //  최신순
-    .order('created_at', { ascending: true }); // 오래된 순
-  if (error) throw error;
-  return data;
-}
-```
-
-## 2. 캐시 데이터 정렬 후 갱신하기
-
-- `src/hooks/mutations/comment/useCreateComment.ts` 업데이트
-
-```ts
-import { createComment } from '@/apis/comment';
-import useProfileData from '@/hooks/queries/useProfileData';
-import { QUERY_KEYS } from '@/lib/constants';
-import { useSession } from '@/stores/session';
-import { Comment, UseMutationCallback } from '@/types/types';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-
-export function useCreateComment(callback?: UseMutationCallback) {
-  const queryClient = useQueryClient();
-  // author_id 를 이용해서 프로필들도 불러와야 함.
-  const session = useSession();
-  const { data: profile } = useProfileData(session?.user.id);
-
-  return useMutation({
-    mutationFn: createComment,
-
-    // 리턴 받은 성공데이터를 매개변수로 자동으로 받습니다.
-    onSuccess: newComment => {
-      if (callback?.onSuccess) callback.onSuccess();
-      // 캐시 업데이트
-      queryClient.setQueryData<Comment[]>(
-        QUERY_KEYS.comments.post(newComment.post_id),
-        comments => {
-          if (!comments) throw new Error('댓글 목록을 찾을 수 없습니다.');
-          if (!profile) throw new Error('사용자 정보를 찾을 수 없습니다.');
-
-          // return [{ ...newComment, author: profile }, ...comments];
-          // 새로운 댓글을 배열의 뒤에 추가형태 반영
-          return [...comments, { ...newComment, author: profile }];
-        }
-      );
-    },
-    onError: error => {
-      if (callback?.onError) callback.onError(error);
-    },
-  });
-}
-```
-
-## 3. 대댓글 데이블
-
-### 3.1. 테이블의 변경
-
-- Post ID 와 Comments ID 는 생성되어 있음.
-- 추가로 `부모 Comments ID` 를 보관해서 관리.
-- `comments` 테이블 칼럼 추가 > `edit table`
-- `parent_comment_id` > `int8` > `Null` > `is Nuallable` > 저장..
-
-### 3.2. FK 설정
-
-- 부모 댓글의 컬럼 id 를 참조할 수 있도록 외래키 관계 설정
-- Add foreign Key reation 버튼 > `comments` > `parent_comment_id` > `id` > `cascade` > `cascade`> save 버튼
-
-### 3.3. 타입 반영
-
-```bash
-npx supabase login
-npm run generate-types
-```
-
-## 4. API 수정하기
-
-- `src/apis/comments.ts` 업데아트
-- `parent_comment_id ? :number`
-
-```ts
-// 1. 댓글 추가하기
-export async function createComment({
-  postId,
-  content,
-  parentCommentId,
-}: {
-  postId: number;
-  content: string;
-  parentCommentId?: number;
-}) {
-  const { data, error } = await supabase
-    .from('comments')
-    .insert({
-      post_id: postId,
-      content: content,
-      parent_comment_id: parentCommentId,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-```
-
-## 5. 기능 구현하기
-
-### 5.1. 대댓글 작성하기
-
-- `srsc/components/comment/CommentItem.tsx` 업데이트
-
-```tsx
-// 대댓글 상태관리
-const [isReplying, setIsReplying] = useState(false);
-const toggleReply = () => {
-  setIsReplying(prev => !prev);
-};
-```
-
-```tsx
-<div onClick={toggleReply} className='cursor-pointer hover:underline'>
-  댓글
-</div>
-```
+- `/src/app/layout.tsx`
 
 ```tsx
 {
-  /*  대댓글 영역 */
+  /* 테마 적용 버튼 */
 }
-{
-  isReplying && (
-    <div className='flex flex-col gap-2'>
-      <CommentEditor
-        type='REPLY'
-        postId={props.post_id}
-        parentCommentId={props.id}
-        onClose={toggleReply}
-      />
+<div className='hover:bg-muted cursor-pointer rounded-full p-2'>
+  <Sun />
+</div>;
+```
+
+- 별도의 컴포넌트로 추출
+- `/src/components/header/ThemeButton.tsx 파일` 생성
+
+```tsx
+import { Sun } from 'lucide-react';
+
+export default function ThemeButton() {
+  return (
+    <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
+      <Sun />
     </div>
   );
 }
 ```
 
-- `/src/components/comment/CommentEdotor.tsx` 업데이트
-- type에 `REPLY` 추가
+- `/src/app/layout.tsx`
 
 ```tsx
-type ReplyMode = {
-  type: 'REPLY';
-  postId: number;
-  parentCommentId: number;
-  onClose: () => void;
-};
-
-type Props = CreateMode | EditMode | ReplyMode;
-```
-
-- 테스트 해보기
-
-### 5.2. UI 개선
-
-- `/src/components/comment/CommentEdotor.tsx` 업데이트
-
-```tsx
-<div className='flex justify-end gap-2'>
-  {(props.type === 'EDIT' || props.type === 'REPLY') && (
-    <Button onClick={() => (props as EditMode).onClose()}>취소</Button>
-  )}
-
-  <Button disabled={isPending} onClick={handleSaveComment}>
-    {props.type === 'EDIT' ? '수정' : '작성'}
-  </Button>
+<div className='flex items-center gap-5'>
+  {/* 테마 적용 버튼 */}
+  <ThemeButton />
+  <ProfileButton />
 </div>
 ```
 
-### 5.3. 대댓글 작성 기능 업데이트
+## 2. 선택 메뉴 추가하기
 
-- `/src/components/comment/CommentEdotor.tsx` 업데이트
+- 펼침 메뉴로 테마 선택하기
+- `/src/components/header/ThemeButton.tsx`
+- 1단계
 
 ```tsx
-const handleSaveComment = () => {
-  if (content.trim() === '') return;
+import { Sun } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
-  if (props.type === 'CREATE') {
-    createComment({ postId: props.postId, content });
-  } else if (props.type === 'EDIT') {
-    // update 실행
-    updateComment({ id: props.commentId, content });
-  } else if (props.type === 'REPLY') {
-    createComment({
-      postId: props.postId,
-      content,
-      parentCommentId: props.parentCommentId,
-    });
+// system :  사용자가 웹브라우저에 셋팅한 테마
+const THEMES = ['system', 'light', 'dark'];
+
+export default function ThemeButton() {
+  return (
+    <Popover>
+      <PopoverTrigger>
+        <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
+          <Sun />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent></PopoverContent>
+    </Popover>
+  );
+}
+```
+
+- 테마 타입 정의하기 : `/src/types/types.ts`
+
+```ts
+export type Theme = 'system' | 'light' | 'dark';
+```
+
+- 2단계 : 타입 활용
+- `/src/components/header/ThemeButton.tsx`
+
+```tsx
+import { Theme } from '@/types/types';
+const THEMES: Theme[] = ['system', 'light', 'dark'];
+```
+
+- 3단계 : 출력 하기 및 클릭 처리
+
+```tsx
+import { Sun } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+
+import { Theme } from '@/types/types';
+import { PopoverClose } from '@radix-ui/react-popover';
+const THEMES: Theme[] = ['system', 'light', 'dark'];
+
+export default function ThemeButton() {
+  return (
+    <Popover>
+      <PopoverTrigger>
+        <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
+          <Sun />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent>
+        {THEMES.map(theme => (
+          <PopoverClose key={`theme-button-${theme}`} asChild>
+            <div>{theme}</div>
+          </PopoverClose>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
+```
+
+- 4단계 : 스타일링
+
+```tsx
+<PopoverClose key={`theme-button-${theme}`} asChild>
+  <div className='hover:bg-muted cursor-pointer p-3'>{theme}</div>
+</PopoverClose>
+```
+
+## 3. 테마 기능 적용하기
+
+### 3.1. 테마 선택 기능
+
+```tsx
+// 테마선택시 실행함
+const onChangeTheme = (theme: Theme) => {};
+```
+
+```tsx
+<div
+  onClick={() => onChangeTheme(theme)}
+  className='hover:bg-muted cursor-pointer p-3'
+>
+  {theme}
+</div>
+```
+
+```tsx
+'use client';
+import { Sun } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+
+import { Theme } from '@/types/types';
+import { PopoverClose } from '@radix-ui/react-popover';
+const THEMES: Theme[] = ['system', 'light', 'dark'];
+
+export default function ThemeButton() {
+  // 테마선택시 실행함
+  const onChangeTheme = (theme: Theme) => {};
+
+  return (
+    <Popover>
+      <PopoverTrigger>
+        <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
+          <Sun />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent>
+        {THEMES.map(theme => (
+          <PopoverClose key={`theme-button-${theme}`} asChild>
+            <div
+              onClick={() => onChangeTheme(theme)}
+              className='hover:bg-muted cursor-pointer p-3'
+            >
+              {theme}
+            </div>
+          </PopoverClose>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
+```
+
+### 3.2. 테마 적용을 위한 `html 태그 변경`
+
+```tsx
+// 테마선택시 실행함
+const onChangeTheme = (theme: Theme) => {
+  // html 의 테마 적용하는 코드로 변경
+  const htmlTag = document.documentElement;
+  // 그냥 무조건 클래스를 지운다.
+  htmlTag.classList.remove('light', 'dark');
+  htmlTag.classList.add(theme);
+};
+```
+
+### 3.3. `system` 테마 적용은 없음.
+
+- system 에 대한 예외처리 진행
+
+```tsx
+// 테마선택시 실행함
+const onChangeTheme = (theme: Theme) => {
+  // html 의 테마 적용하는 코드로 변경
+  const htmlTag = document.documentElement;
+  // 그냥 무조건 클래스를 지운다.
+  htmlTag.classList.remove('light', 'dark');
+  if (theme === 'system') {
+    // 웹브라우저에 사용자가 셋팅한 테마를 적용해야함.
+    const isDarkTheme = window.matchMedia(
+      '(prefers-color-scheme: dark)'
+    ).matches;
+    htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
+  } else {
+    htmlTag.classList.add(theme);
   }
 };
 ```
 
-- supabase 테스트 해보기
-
-## 6. Mutation 업데이트 하기
-
-- `/src/components/comment/CommentEdotor.tsx` 업데이트
-
-```tsx
-const { mutate: createComment, isPending: isCreateCommentPending } =
-  useCreateComment({
-    onSuccess: () => {
-      setContent('');
-      // 대댓글 창이 보이면 닫아준다
-      if (props.type === 'REPLY') props.onClose();
-    },
-    onError: error => {
-      toast.error('댓글 추가에 실패하였습니다.', { position: 'top-center' });
-    },
-  });
-```
-
-- 테스트 : 대댓글 입력창 닫히는지 확인
-
 - 전체 코드
 
 ```tsx
 'use client';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { useCreateComment } from '@/hooks/mutations/comment/useCreateComment';
-import { useUpdateComment } from '@/hooks/mutations/comment/useUpdateComment';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { Sun } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
-// 출력상태 구분 타입 정의
-type CreateMode = {
-  type: 'CREATE';
-  postId: number;
-};
-type EditMode = {
-  type: 'EDIT';
-  commentId: number;
-  initialContent: string;
-  onClose: () => void;
-};
+import { Theme } from '@/types/types';
+import { PopoverClose } from '@radix-ui/react-popover';
+const THEMES: Theme[] = ['system', 'light', 'dark'];
 
-type ReplyMode = {
-  type: 'REPLY';
-  postId: number;
-  parentCommentId: number;
-  onClose: () => void;
-};
-
-type Props = CreateMode | EditMode | ReplyMode;
-
-export default function CommentEditor(props: Props) {
-  //  mutation create 활용
-  const { mutate: createComment, isPending: isCreateCommentPending } =
-    useCreateComment({
-      onSuccess: () => {
-        setContent('');
-        // 대댓글 창이 보이면 닫아준다
-        if (props.type === 'REPLY') props.onClose();
-      },
-      onError: error => {
-        toast.error('댓글 추가에 실패하였습니다.', { position: 'top-center' });
-      },
-    });
-
-  //  mutation update 활용
-  const { mutate: updateComment, isPending: isUpdateCommentPending } =
-    useUpdateComment({
-      onSuccess: () => {
-        (props as EditMode).onClose();
-      },
-      onError: error => {
-        toast.error('댓글 수정에 실패하였습니다.', { position: 'top-center' });
-      },
-    });
-
-  const [content, setContent] = useState('');
-
-  // 초기에 EDIT 이라면 내용 출력
-  useEffect(() => {
-    if (props.type === 'EDIT') {
-      setContent(props.initialContent);
-    }
-  }, []);
-
-  const handleSaveComment = () => {
-    if (content.trim() === '') return;
-
-    if (props.type === 'CREATE') {
-      createComment({ postId: props.postId, content });
-    } else if (props.type === 'EDIT') {
-      // update 실행
-      updateComment({ id: props.commentId, content });
-    } else if (props.type === 'REPLY') {
-      createComment({
-        postId: props.postId,
-        content,
-        parentCommentId: props.parentCommentId,
-      });
+export default function ThemeButton() {
+  // 테마선택시 실행함
+  const onChangeTheme = (theme: Theme) => {
+    // html 의 테마 적용하는 코드로 변경
+    const htmlTag = document.documentElement;
+    // 그냥 무조건 클래스를 지운다.
+    htmlTag.classList.remove('light', 'dark');
+    if (theme === 'system') {
+      // 웹브라우저에 사용자가 셋팅한 테마를 적용해야함.
+      const isDarkTheme = window.matchMedia(
+        '(prefers-color-scheme: dark)'
+      ).matches;
+      htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
+    } else {
+      htmlTag.classList.add(theme);
     }
   };
 
-  const isPending = isCreateCommentPending || isUpdateCommentPending;
-
   return (
-    <div className='flex flex-col gap-2'>
-      <Textarea
-        disabled={isPending}
-        value={content}
-        onChange={e => setContent(e.target.value)}
-      />
-
-      <div className='flex justify-end gap-2'>
-        {(props.type === 'EDIT' || props.type === 'REPLY') && (
-          <Button onClick={() => (props as EditMode).onClose()}>취소</Button>
-        )}
-
-        <Button disabled={isPending} onClick={handleSaveComment}>
-          {props.type === 'EDIT' ? '수정' : '작성'}
-        </Button>
-      </div>
-    </div>
+    <Popover>
+      <PopoverTrigger>
+        <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
+          <Sun />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent>
+        {THEMES.map(theme => (
+          <PopoverClose key={`theme-button-${theme}`} asChild>
+            <div
+              onClick={() => onChangeTheme(theme)}
+              className='hover:bg-muted cursor-pointer p-3'
+            >
+              {theme}
+            </div>
+          </PopoverClose>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }
 ```
 
-## 7. 부모 댓글 아래에 자식 댓글 배치하기
+## 4. 새로고침시 테마 유지하기
 
-- 중첩 배치
-- `/src/components/comment/CommentList.tsx` 업데이트
+### 4.1. Store 만들기
 
-### 7.1. 리턴받은 comment 타입 조건에 맞게 중첩해주는 함수 정의
-
-- 단계 1
-
-```tsx
-// parent_comment_id  를 이용해서 중첩 배열 구조 만들기
-import type { Comment } from '@/types/types';
-function toNestedComments(comments: Comment[]) {}
-```
-
-- 단계 2
-
-```tsx
-// parent_comment_id  를 이용해서 중첩 배열 구조 만들기
-import type { Comment } from '@/types/types';
-function toNestedComments(comments: Comment[]): 반환할타입[] {}
-```
-
-```tsx
-// parent_comment_id  를 이용해서 중첩 배열 구조 만들기
-import type { Comment, NestedComment } from '@/types/types';
-function toNestedComments(comments: Comment[]): NestedComment[] {}
-```
-
-- 단계 3. 중첩 타입 정의 (`/src/types/types.ts`)
+- `/src/stores/themeStore.ts 파일` 생성
 
 ```ts
-// 중첩 댓글 타입
-export type NestedComment = Comment & {
-  parentComment?: Comment;
-  children: NestedComment[]; // 재귀 구조 패턴
+import type { Theme } from '@/types/types';
+import { create } from 'zustand';
+import { combine, devtools, persist } from 'zustand/middleware';
+
+type State = {
+  theme: Theme;
 };
-```
 
-- 단계 4. 반환타입 적용
+const initialState: State = {
+  theme: 'light',
+};
 
-```tsx
-// parent_comment_id  를 이용해서 중첩 배열 구조 만들기
-import type { Comment, NestedComment } from '@/types/types';
-function toNestedComments(comments: Comment[]): NestedComment[] {}
-```
+const useThemeStore = create(
+  devtools(
+    combine(initialState, set => ({
+      actions: {
+        setTheme: (theme: Theme) => {
+          const htmlTag = document.documentElement;
+          htmlTag.classList.remove('light', 'dark');
+          if (theme === 'system') {
+            const isDarkTheme = window.matchMedia(
+              '(prefers-color-scheme: dark)'
+            ).matches;
 
-- 단계 5. 함수 내부 작성
+            htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
+          } else {
+            htmlTag.classList.add(theme);
+          }
 
-```tsx
-function toNestedComments(comments: Comment[]): NestedComment[] {
-  const result: NestedComment[] = [];
-  comments.forEach(comment => {
-    if (!comment.parent_comment_id) {
-      // 부모 댓글이 없으면 부모 댓글로 추가
-      result.push({ ...comment, children: [] });
-    } else {
-      // 특정 댓글에 부모가 존재하므로 대댓글
-      // 부모 댓글 찾기, 중첩 반복으로 찾아냄
-      const parentCommentIndex = result.findIndex(
-        item => item.id === comment.parent_comment_id
-      );
-      // 부모인덱스를 찾았다면, 인덱스를 통해서 자식을 추가
-      result[parentCommentIndex].children.push({
-        ...comment,
-        children: [],
-        parentComment: result[parentCommentIndex],
-      });
-    }
-  });
-
-  return result;
-}
-```
-
-- 단계 6. 함수 활용
-
-```tsx
-'use client';
-
-import CommentItem from '@/components/comment/CommentItem';
-import { useCommentsData } from '@/hooks/queries/useCommentsData';
-import FallBack from '../FallBack';
-import Loader from '../Loader';
-
-// parent_comment_id  를 이용해서 중첩 배열 구조 만들기
-import type { Comment, NestedComment } from '@/types/types';
-function toNestedComments(comments: Comment[]): NestedComment[] {
-  const result: NestedComment[] = [];
-  comments.forEach(comment => {
-    if (!comment.parent_comment_id) {
-      // 부모 댓글이 없으면 부모 댓글로 추가
-      result.push({ ...comment, children: [] });
-    } else {
-      // 특정 댓글에 부모가 존재하므로 대댓글
-      // 부모 댓글 찾기, 중첩 반복으로 찾아냄
-      const parentCommentIndex = result.findIndex(
-        item => item.id === comment.parent_comment_id
-      );
-      // 부모인덱스를 찾았다면, 인덱스를 통해서 자식을 추가
-      result[parentCommentIndex].children.push({
-        ...comment,
-        children: [],
-        parentComment: result[parentCommentIndex],
-      });
-    }
-  });
-
-  return result;
-}
-
-export default function CommentList({ postId }: { postId: number }) {
-  // useQuery 호출
-  const {
-    data: comments,
-    error: fetchCommentsError,
-    isPending: isFetchCommentsPending,
-  } = useCommentsData(postId);
-
-  if (fetchCommentsError) return <FallBack />;
-  if (isFetchCommentsPending) return <Loader />;
-
-  // 중첩된 댓글 목록 정리
-  const nestedComments = toNestedComments(comments || []);
-
-  return (
-    <div className='flex flex-col gap-5'>
-      {/* {comments?.map(comment => (
-        <CommentItem key={comment.id} {...comment} />
-      ))} */}
-      {nestedComments.map(comment => (
-        <CommentItem key={comment.id} {...comment} />
-      ))}
-    </div>
-  );
-}
-```
-
-### 7.2. 대댓글도 출력하기
-
-- `/src/components/comment/CommentItem.tsx` 업데이트
-- props 타입 변경 (`NestedComment`)
-
-```tsx
-// export default function CommentItem(props: Comment) {
-export default function CommentItem(props: NestedComment) {
-```
-
-- children 출력
-
-```tsx
-{
-  /* children 댓글 목록 출력 */
-}
-{
-  props.children.map(comment => <CommentItem key={comment.id} {...comment} />);
-}
-```
-
-- 전체 코드
-
-```tsx
-'use client';
-import Image from 'next/image';
-import Link from 'next/link';
-import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
-// 타입만 import
-import { useDeleteComment } from '@/hooks/mutations/comment/useDeleteComment';
-import { formatTimeAgo } from '@/lib/time';
-import { useOpenAlertModal } from '@/stores/alertModalStore';
-import { useSession } from '@/stores/session';
-import type { NestedComment } from '@/types/types';
-import { useState } from 'react';
-import { toast } from 'sonner';
-import CommentEditor from './CommentEditor';
-
-// export default function CommentItem(props: Comment) {
-export default function CommentItem(props: NestedComment) {
-  const session = useSession();
-
-  // 삭제 mutation
-  const { mutate: deleteComment, isPending: isDeleteCommentPending } =
-    useDeleteComment({
-      onSuccess: () => {},
-      onError: error => {
-        toast.error('댓글 삭제에 실패하였습니다.', { position: 'top-center' });
+          set({ theme });
+        },
       },
-    });
-
-  const openAlertModal = useOpenAlertModal();
-
-  const [isEditing, setIsEditing] = useState(false);
-
-  const toggleEditing = () => {
-    setIsEditing(prev => !prev);
-  };
-
-  // 대댓글 상태관리
-  const [isReplying, setIsReplying] = useState(false);
-  const toggleReply = () => {
-    setIsReplying(prev => !prev);
-  };
-
-  const handleDeleteComment = () => {
-    openAlertModal({
-      title: '댓글 삭제',
-      description: '삭제된 댓글은 되돌릴 수 없습니다. 정말 삭제하시겠습니까?',
-      onPositive: () => {
-        deleteComment(props.id);
-      },
-      onNegative: () => {
-        console.log('취소~');
-      },
-    });
-  };
-
-  const isMine = session?.user.id === props.author.id;
-
-  return (
-    <div className={'flex flex-col gap-8  border-b pb-5'}>
-      <div className='flex items-start gap-4'>
-        <Link href={'#'}>
-          <div className='flex h-full flex-col'>
-            <Image
-              className='h-10 w-10 rounded-full object-cover'
-              src={props.author.avatar_url || defaultAvatar}
-              width={40}
-              height={40}
-              alt={props.author.nickname || '회원 이미지'}
-            />
-          </div>
-        </Link>
-        <div className='flex w-full flex-col gap-2'>
-          <div className='font-bold'>{props.author.nickname}</div>
-
-          {isEditing ? (
-            <CommentEditor
-              type='EDIT'
-              commentId={props.id}
-              initialContent={props.content}
-              onClose={toggleEditing}
-            />
-          ) : (
-            <div>{props.content}</div>
-          )}
-
-          <div className='text-muted-foreground flex justify-between text-sm'>
-            <div className='flex items-center gap-2'>
-              <div
-                onClick={toggleReply}
-                className='cursor-pointer hover:underline'
-              >
-                댓글
-              </div>
-              <div className='bg-border h-[13px] w-[2px]'></div>
-              <div>{formatTimeAgo(props.created_at)}</div>
-            </div>
-            <div className='flex items-center gap-2'>
-              {isMine && (
-                <>
-                  <div
-                    onClick={toggleEditing}
-                    className='cursor-pointer hover:underline'
-                  >
-                    수정
-                  </div>
-                  <div className='bg-border h-[13px] w-[2px]'></div>
-                  <div
-                    className='cursor-pointer hover:underline'
-                    onClick={handleDeleteComment}
-                  >
-                    삭제
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-      {/*  대댓글 영역 */}
-      {isReplying && (
-        <div className='flex flex-col gap-2'>
-          <CommentEditor
-            type='REPLY'
-            postId={props.post_id}
-            parentCommentId={props.id}
-            onClose={toggleReply}
-          />
-        </div>
-      )}
-      {/* children 댓글 목록 출력 */}
-      {props.children.map(comment => (
-        <CommentItem key={comment.id} {...comment} />
-      ))}
-    </div>
-  );
-}
+    }))
+  )
+);
 ```
 
-## 7.3. UI/UX 적용하기
+### 4.2. 로컬스토리지에 보관하려면 `persist` 활용
 
-- `/src/components/comment/CommentItem.tsx` 업데이트
-
-```tsx
-// ui/ux 적용 : 일반적 댓글인지, 대댓글인지를 정의함
-const isRootComment = props.parentComment === undefined;
-```
-
-```tsx
-return (
-  <div
-    className={`flex flex-col gap-8 pb-5 ${isRootComment ? 'border-b' : 'ml-8'}`}
-  >
-```
-
-- 전체 코드
-
-```tsx
-'use client';
-import Image from 'next/image';
-import Link from 'next/link';
-import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
-// 타입만 import
-import { useDeleteComment } from '@/hooks/mutations/comment/useDeleteComment';
-import { formatTimeAgo } from '@/lib/time';
-import { useOpenAlertModal } from '@/stores/alertModalStore';
-import { useSession } from '@/stores/session';
-import type { NestedComment } from '@/types/types';
-import { useState } from 'react';
-import { toast } from 'sonner';
-import CommentEditor from './CommentEditor';
-
-// export default function CommentItem(props: Comment) {
-export default function CommentItem(props: NestedComment) {
-  const session = useSession();
-
-  // 삭제 mutation
-  const { mutate: deleteComment, isPending: isDeleteCommentPending } =
-    useDeleteComment({
-      onSuccess: () => {},
-      onError: error => {
-        toast.error('댓글 삭제에 실패하였습니다.', { position: 'top-center' });
-      },
-    });
-
-  const openAlertModal = useOpenAlertModal();
-
-  const [isEditing, setIsEditing] = useState(false);
-
-  const toggleEditing = () => {
-    setIsEditing(prev => !prev);
-  };
-
-  // 대댓글 상태관리
-  const [isReplying, setIsReplying] = useState(false);
-  const toggleReply = () => {
-    setIsReplying(prev => !prev);
-  };
-
-  const handleDeleteComment = () => {
-    openAlertModal({
-      title: '댓글 삭제',
-      description: '삭제된 댓글은 되돌릴 수 없습니다. 정말 삭제하시겠습니까?',
-      onPositive: () => {
-        deleteComment(props.id);
-      },
-      onNegative: () => {
-        console.log('취소~');
-      },
-    });
-  };
-
-  const isMine = session?.user.id === props.author.id;
-
-  // ui/ux 적용 : 일반적 댓글인지, 대댓글인지를 정의함
-  const isRootComment = props.parentComment === undefined;
-
-  return (
-    <div
-      className={`flex flex-col gap-8 pb-5 ${isRootComment ? 'border-b' : 'ml-8'}`}
-    >
-      <div className='flex items-start gap-4'>
-        <Link href={'#'}>
-          <div className='flex h-full flex-col'>
-            <Image
-              className='h-10 w-10 rounded-full object-cover'
-              src={props.author.avatar_url || defaultAvatar}
-              width={40}
-              height={40}
-              alt={props.author.nickname || '회원 이미지'}
-            />
-          </div>
-        </Link>
-        <div className='flex w-full flex-col gap-2'>
-          <div className='font-bold'>{props.author.nickname}</div>
-
-          {isEditing ? (
-            <CommentEditor
-              type='EDIT'
-              commentId={props.id}
-              initialContent={props.content}
-              onClose={toggleEditing}
-            />
-          ) : (
-            <div>{props.content}</div>
-          )}
-
-          <div className='text-muted-foreground flex justify-between text-sm'>
-            <div className='flex items-center gap-2'>
-              <div
-                onClick={toggleReply}
-                className='cursor-pointer hover:underline'
-              >
-                댓글
-              </div>
-              <div className='bg-border h-[13px] w-[2px]'></div>
-              <div>{formatTimeAgo(props.created_at)}</div>
-            </div>
-            <div className='flex items-center gap-2'>
-              {isMine && (
-                <>
-                  <div
-                    onClick={toggleEditing}
-                    className='cursor-pointer hover:underline'
-                  >
-                    수정
-                  </div>
-                  <div className='bg-border h-[13px] w-[2px]'></div>
-                  <div
-                    className='cursor-pointer hover:underline'
-                    onClick={handleDeleteComment}
-                  >
-                    삭제
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-      {/*  대댓글 영역 */}
-      {isReplying && (
-        <div className='flex flex-col gap-2'>
-          <CommentEditor
-            type='REPLY'
-            postId={props.post_id}
-            parentCommentId={props.id}
-            onClose={toggleReply}
-          />
-        </div>
-      )}
-      {/* children 댓글 목록 출력 */}
-      {props.children.map(comment => (
-        <CommentItem key={comment.id} {...comment} />
-      ))}
-    </div>
-  );
-}
-```
-
-## 8. 무한대댓글
-
-- 대대댓글에 대해서 태그를 통해서 바로 위의 대대댓글임을 표현한다.
-- 자신의 `최상위 댓글의 아이디`와 `댓글의 아이디` 도 알아야함.
-
-### 8.1. 최상위 글의 아이디를 위한 칼럼 추가
-
-- supabase `comments` 테이블에 `칼럼 추가`
-- `root_comment_id` > `int8` > `NULL`
-- 외래키 관계 설정
-- `public` > `comments` > `root_comment_id` > `id` > `Cascade` > `Cascade` > Save
-
-### 8.2. 타입정의
-
-```bash
-npm run generate-types
-```
-
-### 8.3. 댓글 추가 API 수정
-
-- `/src/apis/comment.ts`
+- middleware 의 겹침을 주의하자.
 
 ```ts
-// 1. 댓글 추가하기
-export async function createComment({
-  postId,
-  content,
-  parentCommentId,
-  rootCommentId,
-}: {
-  postId: number;
-  content: string;
-  parentCommentId?: number;
-  rootCommentId?: number;
-}) {
-  const { data, error } = await supabase
-    .from('comments')
-    .insert({
-      post_id: postId,
-      content: content,
-      parent_comment_id: parentCommentId,
-     root_comment_id: rootCommentId,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-```
+import type { Theme } from '@/types/types';
+import { create } from 'zustand';
+import { combine, devtools, persist } from 'zustand/middleware';
 
-### 8.4. 컴포넌트 수정
+type State = {
+  theme: Theme;
+};
 
-- `/src/components/comment/CommentItem.tsx` 업데이트
-- `rootCommentId` 추가
+const initialState: State = {
+  theme: 'light',
+};
 
-```tsx
-{
-  /*  대댓글 영역 */
-}
-{
-  isReplying && (
-    <div className='flex flex-col gap-2'>
-      <CommentEditor
-        type='REPLY'
-        postId={props.post_id}
-        parentCommentId={props.id}
-        rootCommentId={props.root_comment_id || props.id}
-        onClose={toggleReply}
-      />
-    </div>
-  );
-}
-```
+const useThemeStore = create(
+  devtools(
+    persist(
+      combine(initialState, set => ({
+        actions: {
+          setTheme: (theme: Theme) => {
+            const htmlTag = document.documentElement;
+            htmlTag.classList.remove('dark', 'light');
 
-- `/src/components/comment/CommentEditor.tsx` 업데이트
+            if (theme === 'system') {
+              const isDarkTheme = window.matchMedia(
+                '(prefers-color-scheme: dark)'
+              ).matches;
 
-```tsx
-type ReplyMode = {
-  type: 'REPLY';
-  postId: number;
-  parentCommentId: number;
-  rootCommentId: number; // 추가
-  onClose: () => void;
+              htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
+            } else {
+              htmlTag.classList.add(theme);
+            }
+
+            set({ theme });
+          },
+        },
+      })),
+      {
+        name: 'ThemeStore',
+        partialize: store => ({
+          theme: store.theme,
+        }),
+      }
+    ),
+    { name: 'ThemeStore' }
+  )
+);
+
+export const useTheme = () => {
+  const theme = useThemeStore(store => store.theme);
+  return theme;
+};
+
+export const useSetTheme = () => {
+  const setTheme = useThemeStore(store => store.actions.setTheme);
+  return setTheme;
 };
 ```
 
-- `rootCommentId: props.rootCommentId`,
+### 4.3. 활용하기
 
-```tsx
-const handleSaveComment = () => {
-  if (content.trim() === '') return;
+- `/src/stores/themeStore.ts` : 업데이트
 
-  if (props.type === 'CREATE') {
-    createComment({ postId: props.postId, content });
-  } else if (props.type === 'EDIT') {
-    // update 실행
-    updateComment({ id: props.commentId, content });
-  } else if (props.type === 'REPLY') {
-    createComment({
-      postId: props.postId,
-      content,
-      parentCommentId: props.parentCommentId,
-      rootCommentId: props.rootCommentId, // 추가
-    });
+```ts
+// 테마 적용하기
+const applyTheme = (theme: Theme) => {
+  if (typeof window === 'undefined') return;
+
+  const htmlTag = document.documentElement;
+  htmlTag.classList.remove('dark', 'light');
+  if (theme === 'system') {
+    const isDarkTheme = window.matchMedia(
+      '(prefers-color-scheme: dark)'
+    ).matches;
+    htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
+  } else {
+    htmlTag.classList.add(theme);
   }
 };
 ```
 
-### 8.5. 댓글 리스트 `댓글 작성자 아이디` 출력
-
-- `/src/components/comment/CommentList.tsx` 업데이트
-
-```tsx
-function toNestedComments(comments: Comment[]): NestedComment[] {
-  const result: NestedComment[] = [];
-  comments.forEach(comment => {
-    if (!comment.parent_comment_id) {
-      result.push({ ...comment, children: [] });
-    } else {
-      // 특정 댓글에 부모가 존재하므로 대댓글
-      // 부모에 대한 정보를 찾아냄
-      const rootCommentIndex = result.findIndex(
-        item => item.id === comment.root_comment_id
-      );
-      // 실제 부모의 comment 정보
-      const parentComment = comments.find(
-        item => item.id === comment.parent_comment_id
-      );
-      if (rootCommentIndex === -1) return;
-      if (!parentComment) return;
-
-      result[rootCommentIndex].children.push({
-        ...comment,
-        children: [],
-        parentComment: parentComment,
-      });
-    }
-  });
-  return result;
-}
-```
-
-- `/src/components/comment/CommentItem.tsx` 업데이트
-
-```tsx
-// 대댓글의 해시태그 출력을 위한 파악
-const isOverTwoLevels = props.parent_comment_id !== props.root_comment_id;
-```
-
-```tsx
-<div>
-  {isOverTwoLevels && (
-    <span className='font-bold text-blue-500'>
-      @{props.parentComment?.author.nickname}
-    </span>
-  )}
-  {props.content}
-</div>
+```ts
+// localStorage 가 불러와지는 직후에 실행되는 콜백함수
+// Store 가 초기화 될때 한 번 실행되는 콜백함수
+onRehydrateStorage: () => {함수},
+// 단계별 적용 1
+onRehydrateStorage: () => (state, error) => {},
+// 단계별 적용 2
+onRehydrateStorage: () => (state, error) => {
+  if (error) {
+    console.log('로컬스토리지 에러', error);
+    return;
+  }
+  if (state?.theme) {
+    applyTheme(state.theme);
+  }
+},
 ```
 
 - 전체 코드
 
+```ts
+import type { Theme } from '@/types/types';
+import { create } from 'zustand';
+import { combine, devtools, persist } from 'zustand/middleware';
+
+type State = {
+  theme: Theme;
+};
+
+const initialState: State = {
+  theme: 'light',
+};
+
+// 테마 적용하기
+const applyTheme = (theme: Theme) => {
+  if (typeof window === 'undefined') return;
+
+  const htmlTag = document.documentElement;
+  htmlTag.classList.remove('dark', 'light');
+  if (theme === 'system') {
+    const isDarkTheme = window.matchMedia(
+      '(prefers-color-scheme: dark)'
+    ).matches;
+    htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
+  } else {
+    htmlTag.classList.add(theme);
+  }
+};
+
+const useThemeStore = create(
+  devtools(
+    persist(
+      combine(initialState, set => ({
+        actions: {
+          setTheme: (theme: Theme) => {
+            const htmlTag = document.documentElement;
+            htmlTag.classList.remove('dark', 'light');
+
+            if (theme === 'system') {
+              const isDarkTheme = window.matchMedia(
+                '(prefers-color-scheme: dark)'
+              ).matches;
+
+              htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
+            } else {
+              htmlTag.classList.add(theme);
+            }
+
+            set({ theme });
+          },
+        },
+      })),
+      {
+        name: 'ThemeStore',
+        partialize: store => ({
+          theme: store.theme,
+        }),
+        // localStorage 가 불러와지는 직후에 실행되는 콜백함수
+        // Store 가 초기화 될때 한 번 실행되는 콜백함수
+        onRehydrateStorage: () => (state, error) => {
+          if (error) {
+            console.log('로컬스토리지 에러', error);
+            return;
+          }
+          if (state?.theme) {
+            applyTheme(state.theme);
+          }
+        },
+      }
+    ),
+    { name: 'ThemeStore' }
+  )
+);
+
+export const useTheme = () => {
+  const theme = useThemeStore(store => store.theme);
+  return theme;
+};
+
+export const useSetTheme = () => {
+  const setTheme = useThemeStore(store => store.actions.setTheme);
+  return setTheme;
+};
+```
+
+### 4.4. Next.js 의 적용
+
+- `/src/app/layout.tsx` 활용함.(Next.js)
+- Next.js 에서 웹브라우저의 `외부 js 를 실시간 실행시 참조`
+- Next.js 는 Node.js 라서 웹브라우저에 보관한 localStorage를 부를 수 없다.
+
+- 단계 1: 경고 출력하지 않기 (`서버렌더링 결과 HTML 과 클라이언트 렌더링 결과가 다를때`)
+
 ```tsx
-'use client';
-import Image from 'next/image';
-import Link from 'next/link';
-import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
-// 타입만 import
-import { useDeleteComment } from '@/hooks/mutations/comment/useDeleteComment';
-import { formatTimeAgo } from '@/lib/time';
-import { useOpenAlertModal } from '@/stores/alertModalStore';
-import { useSession } from '@/stores/session';
-import type { NestedComment } from '@/types/types';
-import { useState } from 'react';
-import { toast } from 'sonner';
-import CommentEditor from './CommentEditor';
+<html lang='ko' suppressHydrationWarning>
+```
 
-// export default function CommentItem(props: Comment) {
-export default function CommentItem(props: NestedComment) {
-  const session = useSession();
+- 단계 2: 문자열로 html 작성시 경고 출력 하지 않기
 
-  // 삭제 mutation
-  const { mutate: deleteComment, isPending: isDeleteCommentPending } =
-    useDeleteComment({
-      onSuccess: () => {},
-      onError: error => {
-        toast.error('댓글 삭제에 실패하였습니다.', { position: 'top-center' });
-      },
-    });
+```tsx
+ <html lang='ko' suppressHydrationWarning>
+      {/* 추가 */}
+      <head>
 
-  const openAlertModal = useOpenAlertModal();
+      </head>
+```
 
-  const [isEditing, setIsEditing] = useState(false);
+```tsx
+<head>
+  <script dangerouslySetInnerHTML={} />
+</head>
+```
 
-  const toggleEditing = () => {
-    setIsEditing(prev => !prev);
-  };
+```tsx
+<head>
+  <script dangerouslySetInnerHTML={{ __html: `` }} />
+</head>
+```
 
-  // 대댓글 상태관리
-  const [isReplying, setIsReplying] = useState(false);
-  const toggleReply = () => {
-    setIsReplying(prev => !prev);
-  };
-
-  const handleDeleteComment = () => {
-    openAlertModal({
-      title: '댓글 삭제',
-      description: '삭제된 댓글은 되돌릴 수 없습니다. 정말 삭제하시겠습니까?',
-      onPositive: () => {
-        deleteComment(props.id);
-      },
-      onNegative: () => {
-        console.log('취소~');
-      },
-    });
-  };
-
-  const isMine = session?.user.id === props.author.id;
-
-  // ui/ux 적용 : 일반적 댓글인지, 대댓글인지를 정의함
-  const isRootComment = props.parentComment === undefined;
-
-  // 대댓글의 해시태그 출력을 위한 파악
-  const isOverTwoLevels = props.parent_comment_id !== props.root_comment_id;
-
-  return (
-    <div
-      className={`flex flex-col gap-8 pb-5 ${isRootComment ? 'border-b' : 'ml-8'}`}
-    >
-      <div className='flex items-start gap-4'>
-        <Link href={'#'}>
-          <div className='flex h-full flex-col'>
-            <Image
-              className='h-10 w-10 rounded-full object-cover'
-              src={props.author.avatar_url || defaultAvatar}
-              width={40}
-              height={40}
-              alt={props.author.nickname || '회원 이미지'}
-            />
-          </div>
-        </Link>
-        <div className='flex w-full flex-col gap-2'>
-          <div className='font-bold'>{props.author.nickname}</div>
-
-          {isEditing ? (
-            <CommentEditor
-              type='EDIT'
-              commentId={props.id}
-              initialContent={props.content}
-              onClose={toggleEditing}
-            />
-          ) : (
-            <div>
-              {isOverTwoLevels && (
-                <span className='font-bold text-blue-500'>
-                  @{props.parentComment?.author.nickname}
-                </span>
-              )}
-              {props.content}
-            </div>
-          )}
-
-          <div className='text-muted-foreground flex justify-between text-sm'>
-            <div className='flex items-center gap-2'>
-              <div
-                onClick={toggleReply}
-                className='cursor-pointer hover:underline'
-              >
-                댓글
-              </div>
-              <div className='bg-border h-[13px] w-[2px]'></div>
-              <div>{formatTimeAgo(props.created_at)}</div>
-            </div>
-            <div className='flex items-center gap-2'>
-              {isMine && (
-                <>
-                  <div
-                    onClick={toggleEditing}
-                    className='cursor-pointer hover:underline'
-                  >
-                    수정
-                  </div>
-                  <div className='bg-border h-[13px] w-[2px]'></div>
-                  <div
-                    className='cursor-pointer hover:underline'
-                    onClick={handleDeleteComment}
-                  >
-                    삭제
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-      {/*  대댓글 영역 */}
-      {isReplying && (
-        <div className='flex flex-col gap-2'>
-          <CommentEditor
-            type='REPLY'
-            postId={props.post_id}
-            parentCommentId={props.id}
-            rootCommentId={props.root_comment_id || props.id}
-            onClose={toggleReply}
-          />
-        </div>
-      )}
-      {/* children 댓글 목록 출력 */}
-      {props.children.map(comment => (
-        <CommentItem key={comment.id} {...comment} />
-      ))}
-    </div>
-  );
-}
+```tsx
+<head>
+  <script
+    dangerouslySetInnerHTML={{
+      __html: `(function() {
+                try {
+                  const stored = localStorage.getItem('ThemeStore');
+                  if (stored) {
+                    const parsed = JSON.parse(stored);
+                    const themeValue = parsed?.state?.theme || parsed?.theme || 'light';
+                    const htmlTag = document.documentElement;
+                    htmlTag.classList.remove('dark', 'light');
+                    
+                    if (themeValue === 'system') {
+                      const isDarkTheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                      htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
+                    } else {
+                      htmlTag.classList.add(themeValue);
+                    }
+                  }
+                } catch (e) {
+                  console.error('Theme initialization error:', e);
+                }
+              })()`,
+    }}
+  />
+</head>
 ```

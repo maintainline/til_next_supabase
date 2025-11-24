@@ -9,6 +9,7 @@ import ToastProvider from '@/components/providers/ToastProvider';
 import SessionProvider from '@/components/providers/SessionProvider';
 import ModalProvider from '@/components/providers/ModalProvider';
 import ProfileButton from '@/components/header/ProfileButton';
+import ThemeButton from '@/components/header/ThemeButton';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -35,12 +36,40 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='ko'>
+    <html lang='ko' suppressHydrationWarning>
+      {/* 추가 */}
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function() {
+                try {
+                  const stored = localStorage.getItem('ThemeStore');
+                  if (stored) {
+                    const parsed = JSON.parse(stored);
+                    const themeValue = parsed?.state?.theme || parsed?.theme || 'light';
+                    const htmlTag = document.documentElement;
+                    htmlTag.classList.remove('dark', 'light');
+                    
+                    if (themeValue === 'system') {
+                      const isDarkTheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                      htmlTag.classList.add(isDarkTheme ? 'dark' : 'light');
+                    } else {
+                      htmlTag.classList.add(themeValue);
+                    }
+                  }
+                } catch (e) {
+                  console.error('Theme initialization error:', e);
+                }
+              })()`,
+          }}
+        />
+      </head>
+
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* portal 용 div */}
-        <div id='modal-root'></div>
+        {/* Portal 용 DIV */}
+        <div id='modal-root' />
 
         <div className='flex min-h-[100vh] flex-col'>
           {/* 컴포넌트 배치 */}
@@ -62,9 +91,8 @@ export default function RootLayout({
                     </Link>
 
                     <div className='flex items-center gap-5'>
-                      <div className='hover:bg-muted cursor-pointer rounded-full p-2'>
-                        <Sun />
-                      </div>
+                      {/* 테마 적용 버튼 */}
+                      <ThemeButton />
                       <ProfileButton />
                     </div>
                   </div>
