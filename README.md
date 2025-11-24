@@ -1,340 +1,163 @@
-# 회원 탈퇴
+# 회원가입 시 예외 처리
 
-## 1. 기초 기능 구성
+- 회원가입을 하면 Supabase 에서 자동로그인을 시킴(세션을 생성함)
+- `회원가입 성공`시 무조건 `로그아웃` 후 `로그인으로 이동`
 
-### 1.1. 회원 탈퇴 버튼 만들기
+## 1. `src/apis/auth.ts` 업데이트
 
-- `src/components/profile/DeleteProfileButton.tsx 파일` 생성
+```ts
+// supabase 백엔드에 사용자 이메일 회원가입
+export async function signUpWithEmail({
+  email,
+  password,
+}: {
+  email: string;
+  password: string;
+}) {
+  // 웹브라우저를 이용해서 이메일 회원가입
+  const { data, error } = await supabase.auth.signUp({ email, password });
 
-```tsx
-'use client';
-import { Button } from '@/components/ui/button';
-import { useOpenAlertModal } from '@/stores/alertModalStore';
+  if (error) throw error;
 
-export default function DeleteProfileButton() {
-  const openAlertModal = useOpenAlertModal();
+  // 강제로 로그아웃 시키기
+  await signOut();
 
-  const handleClick = () => {
-    openAlertModal({
-      title: '회원 탈퇴',
-      description: '정말로 회원을 탈퇴하시겠습니까?',
-      onPositive: () => {
-        console.log('회원탈퇴');
-      },
-    });
-  };
-
-  return (
-    <Button
-      variant='destructive'
-      className='cursor-pointer'
-      onClick={handleClick}
-    >
-      회원 탈퇴
-    </Button>
-  );
+  return data;
 }
 ```
 
-### 1.2. 컴포넌트 출력
+## 2. `src/hooks/mutations/auth/useSignUp.ts`
 
-- `src/components/profile/ProfileInfo.tsx`
+- onMutate, onSuccess, onError, onSettled 콜백을 모두 전달해 화면 단에서 후처리(토스트, 라우팅 등)를 제어할 수 있게 확장.
+
+```ts
+import { signUpWithEmail } from '@/apis/auth';
+import { UseMutationCallback } from '@/types/types';
+import { useMutation } from '@tanstack/react-query';
+
+export function useSignUp(callback?: UseMutationCallback) {
+  return useMutation({
+    mutationFn: signUpWithEmail,
+    onMutate: () => {
+      if (callback?.onMutate) callback.onMutate();
+    },
+    onSuccess: () => {
+      if (callback?.onSuccess) callback.onSuccess();
+    },
+    onError: error => {
+      console.error(error.message);
+      if (callback?.onError) callback.onError(error);
+    },
+    onSettled: () => {
+      if (callback?.onSettled) callback.onSettled();
+    },
+  });
+}
+```
+
+## 3. `src/app/(default)/signup/page.tsx`
 
 ```tsx
-{
-  /* 프로필 수정 */
-}
-{
-  isMine && (
-    <div>
-      <EditProfileButton />
-      <DeleteProfileButton />
-    </div>
-  );
-}
+const router = useRouter();
+// Mutation Hook 활용하기
+// 1. 이메일 mutation 훅
+const { mutate, isPending } = useSignUp({
+  onSuccess: () => {
+    toast.success('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.', {
+      position: 'top-center',
+    });
+    router.replace('/signin');
+  },
+
+  onError: error => {
+    const message = getErrorMessage(error);
+    toast.error(message, { position: 'top-center' });
+  },
+});
 ```
 
 - 전체 코드
 
 ```tsx
 'use client';
-import useProfileData from '@/hooks/queries/useProfileData';
-import FallBack from '../FallBack';
-import Loader from '../Loader';
-import defaultAvatar from '/public/assets/icons/default-avatar.jpg';
-import Image from 'next/image';
-import { useEffect } from 'react';
-import EditProfileButton from './EditProfileButton';
-import { useSession } from '@/stores/session';
-import DeleteProfileButton from './DeleteProfileButton';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useSignUp } from '@/hooks/auth/useSignUp';
+import { getErrorMessage } from '@/lib/error';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
-export default function ProfileInfo({ userId }: { userId: string }) {
-  // 세션 정보 참조하기(zustand 보관됨)
-  const session = useSession();
-  // 본인인지를 검증
-  const isMine = session?.user.id === userId;
+function SignUp() {
+  // 컴포넌트 상태
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const {
-    data: profile,
-    error: fetchProfileError,
-    isPending: isFetchingProfile,
-  } = useProfileData(userId);
+  const router = useRouter();
+  // Mutation Hook 활용하기
+  // 1. 이메일 mutation 훅
+  const { mutate, isPending } = useSignUp({
+    onSuccess: () => {
+      toast.success('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.', {
+        position: 'top-center',
+      });
+      router.replace('/signin');
+    },
 
-  useEffect(() => {
-    window.scrollTo({ top: 0 });
-  }, []);
+    onError: error => {
+      const message = getErrorMessage(error);
+      toast.error(message, { position: 'top-center' });
+    },
+  });
 
-  if (fetchProfileError) return <FallBack />;
-  if (isFetchingProfile) return <Loader />;
+  // 회원가입 버튼 클릭처리
+  const handleSignUpClick = () => {
+    if (!email.trim()) return;
+    if (!password.trim()) return;
+    // supabase 회원가입 처리 코드
+    mutate({ email: email, password: password });
+  };
 
   return (
-    <div className='flex flex-col items-center  justify-center gap-5'>
-      <Image
-        src={profile?.avatar_url || defaultAvatar}
-        alt={`${profile?.nickname}의 프로필 이미지`}
-        className='h-30 w-30 rounded-full object-cover'
-        width={120}
-        height={120}
-      />
-      <div className='flex flex-col items-center gap-2'>
-        <div className='text-l font-bold'>{profile?.nickname}</div>
-        <div className=' text-muted-foreground'>{profile?.bio}</div>
-        <div className='text-muted-foreground'>{profile?.role}</div>
+    <div className='flex flex-col gap-8'>
+      <div className='text-xl font-bold'>회원가입</div>
+      <div className='flex flex-col gap-2'>
+        <Input
+          value={email}
+          disabled={isPending}
+          onChange={e => setEmail(e.target.value)}
+          type='email'
+          placeholder='example@example.com'
+        />
+        <Input
+          value={password}
+          disabled={isPending}
+          onChange={e => setPassword(e.target.value)}
+          type='password'
+          placeholder='password'
+        />
       </div>
-
-      {/* 프로필 수정 */}
-      {isMine && (
-        <div>
-          <EditProfileButton />
-          <DeleteProfileButton />
-        </div>
-      )}
+      <div>
+        <Button
+          disabled={isPending}
+          className='w-full'
+          onClick={handleSignUpClick}
+        >
+          {isPending ? '회원등록중...' : '회원가입'}
+        </Button>
+      </div>
+      <div>
+        <Link
+          href={'/signin'}
+          className='text-muted-foreground hover:underline'
+        >
+          이미 계정이 있다면? 로그인
+        </Link>
+      </div>
     </div>
   );
 }
-```
 
-## 2. Supabase 회원 탈퇴 적용하기
-
-- Next.js 에서만 가능함.
-- supabase 의 Role Key 즉, `관리자 키`가 필요로함.
-
-### 2.1. `.env` 중요함
-
-- `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE` 접두어는 웹브라우저에 노출될 소지 있음.
-- `SUPABASE_SERVICE_ROLE` 없으면 Next.js 서버에서만 활용됨.
-
-```txt
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE=
-NEXT_PUBLIC_APP_URL=
-```
-
-### 2.2. `src/app/api/기능명/route.ts` 폴더 및 파일의 이해
-
-- `src/app/페이지폴더명/page.tsx` 는 웹브라우저 경로 및 파일명
-- `SERVICE ROLE KEY` 는 서버 전용으로 `숨겨야 함.`
-- `src/app/api` 폴더명은 약속되어있음
-- `src/app/api/기능명/route.ts 파일` 은 약속되어있음
-
-## 3. 탈퇴기능 작성하기
-
-### 3.1. 버튼 기능 구현하기
-
-- `/src/components/profile/DeleteProfileButton.tsx`
-
-```tsx
-const router = useRouter();
-const setSession = useSetSession();
-const deleteProfile = async () => {
-  try {
-    // src/app/api/profile/delete/route.ts 라우트 API 실행
-    const response = await fetch('/api/profile/delete', {
-      method: 'POST',
-    });
-
-    if (!response.ok) {
-      const { message } = await response.json();
-      throw new Error(message);
-    }
-
-    await signOut();
-    setSession(null);
-    router.replace('/signin');
-    router.refresh();
-  } catch (error) {
-    console.log(error);
-    openAlertModal({
-      title: '회원 탈퇴 실패',
-      description: '잠시 후 다시 시도해주세요.',
-    });
-  }
-};
-
-const handleClick = () => {
-  openAlertModal({
-    title: '회원 탈퇴',
-    description: '정말로 회원을 탈퇴하시겠습니까?',
-    onPositive: deleteProfile,
-  });
-};
-```
-
-### 3.2. API 만들기
-
-- `src/lib/supabase/admin.ts 파일` 생성
-
-```ts
-import { Database } from '@/types/database.types';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE;
-
-export function createAdminClient() {
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Supabase admin credentials are missing.');
-  }
-
-  return createClient<Database>(supabaseUrl, serviceRoleKey);
-}
-```
-
-- 위의 파일을 활용해서 Admin 에서 활용할 API 를 생성해 보자.
-- `src/app/api/profile/delete 폴더` 생성
-- `src/app/api/profile/delete/route.ts 파일` 생성
-
-```ts
-import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient as createServerClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
-
-export async function POST() {
-  try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-      error: sessionError,
-    } = await supabase.auth.getUser();
-
-    if (sessionError || !user) {
-      return NextResponse.json(
-        { message: '로그인이 필요합니다.' },
-        { status: 401 }
-      );
-    }
-
-    const admin = createAdminClient();
-    const { error: deleteProfileError } = await admin
-      .from('profiles')
-      .delete()
-      .eq('id', user.id);
-
-    if (deleteProfileError && deleteProfileError.code !== 'PGRST116') {
-      console.error(deleteProfileError);
-      return NextResponse.json(
-        { message: '프로필 삭제에 실패했습니다.' },
-        { status: 500 }
-      );
-    }
-
-    const { error: deleteUserError } = await admin.auth.admin.deleteUser(
-      user.id
-    );
-
-    if (deleteUserError) {
-      console.error(deleteUserError);
-      return NextResponse.json(
-        { message: '회원 탈퇴 처리에 실패했습니다.' },
-        { status: 500 }
-      );
-    }
-
-    await supabase.auth.signOut();
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json(
-      { message: '서버 오류가 발생했습니다.' },
-      { status: 500 }
-    );
-  }
-}
-```
-
-## 4. 적용하기
-
-- `/src/components/profile/DeleteProfileButton.tsx` : 업데이트
-
-```tsx
-//   router.refresh();
-if (typeof window !== 'undefined') {
-  window.location.assign('/signin');
-}
-```
-
-- 전체코드
-
-```tsx
-'use client';
-import { signOut } from '@/apis/auth';
-import { Button } from '@/components/ui/button';
-import { useOpenAlertModal } from '@/stores/alertModalStore';
-
-import { useSetSession } from '@/stores/session';
-import { useRouter } from 'next/navigation';
-
-export default function DeleteProfileButton() {
-  const openAlertModal = useOpenAlertModal();
-
-  const router = useRouter();
-  const setSession = useSetSession();
-  const deleteProfile = async () => {
-    try {
-      // src/app/api/profile/delete/route.ts 라우트 API 실행
-      const response = await fetch('/api/profile/delete', {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        const { message } = await response.json();
-        throw new Error(message);
-      }
-
-      await signOut();
-      setSession(null);
-      router.replace('/signin');
-      // router.refresh();
-      if (typeof window !== 'undefined') {
-        window.location.assign('/signin');
-      }
-    } catch (error) {
-      console.log(error);
-      openAlertModal({
-        title: '회원 탈퇴 실패',
-        description: '잠시 후 다시 시도해주세요.',
-      });
-    }
-  };
-
-  const handleClick = () => {
-    openAlertModal({
-      title: '회원 탈퇴',
-      description: '정말로 회원을 탈퇴하시겠습니까?',
-      onPositive: deleteProfile,
-    });
-  };
-
-  return (
-    <Button
-      variant='destructive'
-      className='cursor-pointer'
-      onClick={handleClick}
-    >
-      회원 탈퇴
-    </Button>
-  );
-}
+export default SignUp;
 ```

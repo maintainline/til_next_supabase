@@ -14,6 +14,9 @@ export async function signUpWithEmail({
 
   if (error) throw error;
 
+  // 강제로 로그아웃 시키기
+  await signOut();
+
   return data;
 }
 

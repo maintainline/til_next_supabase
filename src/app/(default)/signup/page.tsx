@@ -3,8 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useSignUp } from '@/hooks/auth/useSignUp';
 import { getErrorMessage } from '@/lib/error';
-import { error } from 'console';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -13,9 +13,17 @@ function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  const router = useRouter();
   // Mutation Hook 활용하기
   // 1. 이메일 mutation 훅
   const { mutate, isPending } = useSignUp({
+    onSuccess: () => {
+      toast.success('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.', {
+        position: 'top-center',
+      });
+      router.replace('/signin');
+    },
+
     onError: error => {
       const message = getErrorMessage(error);
       toast.error(message, { position: 'top-center' });
