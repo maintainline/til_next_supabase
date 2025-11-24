@@ -96,10 +96,14 @@ export default function PostItem({
           <CarouselContent>
             {post.image_urls?.map((url, index) => (
               <CarouselItem className={`basis-3/5`} key={index}>
-                <div className='overflow-hidden rounded-xl'>
-                  <img
+                <div className='relative h-[350px] w-full overflow-hidden rounded-xl'>
+                  <Image
                     src={url}
-                    className='h-full max-h-[350px] w-full object-cover'
+                    alt={`게시글 이미지 ${index + 1}`}
+                    fill
+                    className='object-cover'
+                    sizes='(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
+                    priority={index === 0}
                   />
                 </div>
               </CarouselItem>
